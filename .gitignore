@@ -1,0 +1,23 @@
+# Gradle / Kotlin
+.gradle/
+.kotlin/
+build/
+**/build/
+local.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# macOS
+.DS_Store
+
+# Локальные файлы, не для публикации
+nohup.out
+session-*.md
+AGENTS.md
+/messages/
+
+# Бэкапы патчей
+*.orig
