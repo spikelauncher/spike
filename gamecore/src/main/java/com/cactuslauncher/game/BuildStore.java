@@ -6,7 +6,10 @@ import java.util.*;
 
 public final class BuildStore {
     /** {@code autoUpdateMods}: check Modrinth and install compatible mod updates before each launch (off by default). */
-    public record Build(String id, String name, String version, String loader, String icon, boolean autoUpdateMods) {
+    public record Build(String id, String name, String version, String loader, String icon, boolean autoUpdateMods, Path instancesDirectory) {
+        public Build(String id, String name, String version, String loader, String icon, boolean autoUpdateMods) {
+            this(id, name, version, loader, icon, autoUpdateMods, null);
+        }
         public Build(String id, String name, String version, String loader, String icon) { this(id, name, version, loader, icon, false); }
     }
     private final Path file;
@@ -37,7 +40,11 @@ public final class BuildStore {
                 if (!names.add(name.toLowerCase(Locale.ROOT))) throw new IllegalArgumentException();
                 String icon = properties.getProperty(prefix + "icon", "grass");
                 if (!List.of("grass", "dirt", "stone", "diamond", "snapshot", "custom").contains(icon)) throw new IllegalArgumentException();
-                result.add(new Build(id, name, version, loader, icon, Boolean.parseBoolean(properties.getProperty(prefix + "autoUpdateMods"))));
+                String location = properties.getProperty(prefix + "instancesDirectory");
+                Path instances = location == null ? null : Path.of(location);
+                if (instances != null && !instances.isAbsolute()) throw new IllegalArgumentException();
+                result.add(new Build(id, name, version, loader, icon, Boolean.parseBoolean(properties.getProperty(prefix + "autoUpdateMods")),
+                        instances == null ? null : instances.normalize()));
             }
             return List.copyOf(result);
         } catch (RuntimeException e) {
@@ -46,9 +53,16 @@ public final class BuildStore {
     }
 
     public synchronized List<Build> create(String name, String version, String loader) throws IOException {
+        return create(name, version, loader, null);
+    }
+
+    /** New builds use the selected game folder; existing builds keep their recorded locations. */
+    public synchronized List<Build> create(String name, String version, String loader, Path gameDirectory) throws IOException {
         var builds = new ArrayList<>(load());
         name = uniqueName(name, builds, null);
-        var build = new Build(UUID.randomUUID().toString(), name, validVersion(version), validLoader(loader), "grass");
+        Path instances = gameDirectory == null ? null : gameDirectory.toAbsolutePath().normalize().resolve("instances");
+        var build = new Build(UUID.randomUUID().toString(), name, validVersion(version), validLoader(loader), "grass", false, instances);
+        Path directory = instancesDirectory(build);
         Path folder = directory.resolve(build.id());
         if (Files.isSymbolicLink(directory)) throw new IOException("Папка сборок не должна быть символической ссылкой.");
         Files.createDirectories(directory);
@@ -67,7 +81,7 @@ public final class BuildStore {
         var builds = load();
         require(builds, id);
         String valid = uniqueName(name, builds, id);
-        var next = builds.stream().map(b -> b.id().equals(id) ? new Build(id, valid, b.version(), b.loader(), b.icon(), b.autoUpdateMods()) : b).toList();
+        var next = builds.stream().map(b -> b.id().equals(id) ? new Build(id, valid, b.version(), b.loader(), b.icon(), b.autoUpdateMods(), b.instancesDirectory()) : b).toList();
         save(next);
         return next;
     }
@@ -78,14 +92,16 @@ public final class BuildStore {
 
     public synchronized List<Build> delete(String id, boolean deleteFiles) throws IOException {
         var builds = load();
-        require(builds, id);
+        Build build = require(builds, id);
         var next = builds.stream().filter(b -> !b.id().equals(id)).toList();
         save(next);
-        if (deleteFiles) deleteInstance(id);
+        if (deleteFiles) deleteInstance(build);
         return next;
     }
 
-    private void deleteInstance(String id) throws IOException {
+    private void deleteInstance(Build build) throws IOException {
+        Path directory = instancesDirectory(build);
+        String id = build.id();
         if (Files.isSymbolicLink(directory)) throw new IOException("Папка сборок не должна быть символической ссылкой.");
         Path instance = directory.resolve(id).normalize();
         if (!instance.getParent().equals(directory) || Files.isSymbolicLink(instance) || !Files.exists(instance, LinkOption.NOFOLLOW_LINKS)) return;
@@ -98,7 +114,7 @@ public final class BuildStore {
         if (!List.of("grass", "dirt", "stone", "diamond", "snapshot", "custom").contains(icon)) throw new IllegalArgumentException("Неизвестная иконка.");
         var builds = load();
         require(builds, id);
-        var next = builds.stream().map(b -> b.id().equals(id) ? new Build(id, b.name(), b.version(), b.loader(), icon, b.autoUpdateMods()) : b).toList();
+        var next = builds.stream().map(b -> b.id().equals(id) ? new Build(id, b.name(), b.version(), b.loader(), icon, b.autoUpdateMods(), b.instancesDirectory()) : b).toList();
         save(next);
         return next;
     }
@@ -106,13 +122,14 @@ public final class BuildStore {
     public synchronized List<Build> setAutoUpdateMods(String id, boolean enabled) throws IOException {
         var builds = load();
         require(builds, id);
-        var next = builds.stream().map(b -> b.id().equals(id) ? new Build(id, b.name(), b.version(), b.loader(), b.icon(), enabled) : b).toList();
+        var next = builds.stream().map(b -> b.id().equals(id) ? new Build(id, b.name(), b.version(), b.loader(), b.icon(), enabled, b.instancesDirectory()) : b).toList();
         save(next);
         return next;
     }
 
     public synchronized Path folder(String id) throws IOException {
-        require(load(), id);
+        Build build = require(load(), id);
+        Path directory = instancesDirectory(build);
         Path folder = directory.resolve(id);
         if (Files.isSymbolicLink(directory) || Files.isSymbolicLink(folder)) throw new IOException("Папка сборки не должна быть символической ссылкой.");
         Files.createDirectories(folder);
@@ -128,11 +145,11 @@ public final class BuildStore {
 
     /** Epoch millis of the last launch attempt, or 0 if the build was never launched. */
     public synchronized long lastLaunched(String id) {
-        Path marker = directory.resolve(id).resolve(".cactus-last-launch");
         try {
+            Path marker = instancesDirectory(require(load(), id)).resolve(id).resolve(".cactus-last-launch");
             if (Files.isSymbolicLink(marker) || !Files.isRegularFile(marker, LinkOption.NOFOLLOW_LINKS)) return 0;
             return Long.parseLong(Files.readString(marker).trim());
-        } catch (IOException | NumberFormatException ignored) { return 0; }
+        } catch (IOException | IllegalArgumentException ignored) { return 0; }
     }
 
     public synchronized Path logFile(String id) throws IOException {
@@ -170,8 +187,13 @@ public final class BuildStore {
         return LogTail.read(logFile(id), offset, maxBytes);
     }
 
-    private static void require(List<Build> builds, String id) {
-        if (builds.stream().noneMatch(b -> b.id().equals(id))) throw new IllegalArgumentException("Сборка не найдена.");
+    private Path instancesDirectory(Build build) {
+        return build.instancesDirectory() == null ? directory : build.instancesDirectory();
+    }
+
+    private static Build require(List<Build> builds, String id) {
+        return builds.stream().filter(b -> b.id().equals(id)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Сборка не найдена."));
     }
 
     private static String uniqueName(String name, List<Build> builds, String excluded) {
@@ -210,6 +232,7 @@ public final class BuildStore {
             properties.setProperty(prefix + "version", build.version());
             properties.setProperty(prefix + "loader", build.loader());
             properties.setProperty(prefix + "icon", build.icon());
+            if (build.instancesDirectory() != null) properties.setProperty(prefix + "instancesDirectory", build.instancesDirectory().toString());
             if (build.autoUpdateMods()) properties.setProperty(prefix + "autoUpdateMods", "true");
         }
         Path temp = Files.createTempFile(file.getParent(), "builds-", ".tmp");

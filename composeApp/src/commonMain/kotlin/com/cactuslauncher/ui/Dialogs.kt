@@ -481,7 +481,8 @@ fun SettingsDialog(
                     GameRow("Продвинутый режим") { Switch(settings.advancedMode) { settings.advancedMode = it } }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    T("Папка игры", 13, C.text2, lineHeight = 16)
+                    T("Папка для новых сборок", 13, C.text2, lineHeight = 16)
+                    T("Существующие сборки останутся в своих папках.", 13, C.text2, lineHeight = 18)
                     if (editingFolder) {
                         SearchBox(settings.folder, { settings.folder = it }, "Папка игры", Modifier.fillMaxWidth(), height = 44.dp)
                         T("Готово", 15, C.accent, FontWeight.Medium, lineHeight = 18, modifier = Modifier.buttonClickNoRipple { editingFolder = false })
@@ -764,7 +765,7 @@ fun InitialSetupDialog(
                         T(if (currentStep == 1) "Как вас зовут?" else "Папка для игры", 28, C.text1, FontWeight.SemiBold, lineHeight = 34)
                         T(
                             if (currentStep == 1) "Имя будет видно в лаунчере. Его можно поменять в любой момент."
-                            else "Здесь будут храниться сборки, миры и моды. Папку можно поменять позже.",
+                            else "Здесь будут храниться новые сборки, миры и моды. Папку для новых сборок можно поменять позже.",
                             15, C.text2, lineHeight = 20,
                         )
                     }

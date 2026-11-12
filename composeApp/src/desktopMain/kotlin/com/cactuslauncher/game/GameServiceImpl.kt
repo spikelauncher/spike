@@ -93,7 +93,8 @@ class GameServiceImpl(private val core: GameCore = GameCore()) : GameService {
     override suspend fun createBuild(name: String, version: String, loader: String) = withContext(Dispatchers.IO) {
         require(versionCatalog.load().any { it.id() == version }) { "Версия отсутствует в каталоге Minecraft." }
         if (loader.equals("Forge", ignoreCase = true)) LoaderInstaller.resolveForge(version)
-        buildStore.create(name, version, loader).uiBuilds()
+        val gameFolder = java.nio.file.Path.of(preferencesStore.load()?.folder() ?: core.defaultGameDir())
+        buildStore.create(name, version, loader, gameFolder).uiBuilds()
     }
     override suspend fun renameBuild(id: String, name: String) = withContext(Dispatchers.IO) { buildStore.rename(id, name).uiBuilds() }
     override suspend fun setBuildIcon(id: String, icon: String) = withContext(Dispatchers.IO) {
