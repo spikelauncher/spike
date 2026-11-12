@@ -11,6 +11,8 @@ public final class CrashDiagnosis {
     public record Result(String title, String detail, String evidence, String suspectMod, String confidence, boolean recoverable) {}
 
     private static final Pattern FRAME = Pattern.compile("\\bat ([\\w$]+(?:\\.[\\w$]+)+)\\(");
+    // Match an exception name, not JVM options such as -XX:+ExitOnOutOfMemoryError.
+    private static final Pattern MEMORY_ERROR = Pattern.compile("(?i)\\bOutOfMemoryError\\b|\\bjava heap space\\b");
     public static final String UNKNOWN_TITLE = "Причина не определяется однозначно";
     public static final String NO_LOGS_TITLE = "Запусков для разбора пока нет";
     private static final List<String> LOGS = List.of("logs/latest.log", "logs/cactus-launch.log");
@@ -23,7 +25,7 @@ public final class CrashDiagnosis {
         String title;
         String detail;
         boolean recoverable = false;
-        if (lower.contains("outofmemoryerror") || lower.contains("java heap space")) {
+        if (MEMORY_ERROR.matcher(text).find()) {
             title = "Не хватило памяти Java";
             detail = "Игре не хватило выделенной памяти. Добавьте память в настройках сборки или закройте тяжёлые программы.";
         } else if (lower.contains("no supported graphics backend") || lower.contains("couldn't find matching glx visual")
@@ -141,7 +143,11 @@ public final class CrashDiagnosis {
 
     private static String firstEvidence(String text, String lower, ClassMatch match) {
         for (String token : List.of("No supported graphics backend", "Couldn't find matching GLX visual", "OutOfMemoryError", "UnsupportedClassVersionError", "ModResolutionException", "Mixin apply failed", "MixinApplyError", "NoSuchMethodError", "NoClassDefFoundError", "ClassNotFoundException", "UnsatisfiedLinkError", "Failed to locate library", "Duplicate mods")) {
-            int index = lower.indexOf(token.toLowerCase(Locale.ROOT));
+            int index;
+            if (token.equals("OutOfMemoryError")) {
+                Matcher memory = MEMORY_ERROR.matcher(text);
+                index = memory.find() ? memory.start() : -1;
+            } else index = lower.indexOf(token.toLowerCase(Locale.ROOT));
             if (index >= 0) return text.substring(Math.max(0, index - 80), Math.min(text.length(), index + token.length() + 180)).replace('\n', ' ').trim();
         }
         if (match != null) return "Класс " + match.className().replace('/', '.').replace(".class", "") + " найден в " + match.fileName() + ".";
