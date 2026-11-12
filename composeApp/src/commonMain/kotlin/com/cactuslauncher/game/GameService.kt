@@ -3,9 +3,13 @@ import com.cactuslauncher.model.ProfileSnapshot
 import com.cactuslauncher.model.AudioMixerSnapshot
 import com.cactuslauncher.model.TrackSnapshot
 import com.cactuslauncher.model.LauncherUpdate
+import com.cactuslauncher.model.NewsArticle
+import androidx.compose.ui.graphics.ImageBitmap
 
 /** Everything the UI needs from the game core; implemented by GameServiceImpl. */
 interface GameService {
+    suspend fun loadNews(refresh: Boolean): List<NewsArticle>
+    suspend fun newsImage(url: String): ImageBitmap?
     suspend fun launchHorizon(onRunning: (String) -> Unit): HorizonExit = error("Horizon недоступен на этой платформе.")
     suspend fun horizonInstallation(): HorizonInstallation? = null
     suspend fun horizonPrepared(): Boolean = false

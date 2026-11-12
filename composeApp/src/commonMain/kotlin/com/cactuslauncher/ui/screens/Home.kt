@@ -19,7 +19,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,7 +27,8 @@ import com.cactuslauncher.ui.T
 import com.cactuslauncher.ui.clickNoRipple
 import com.cactuslauncher.ui.buttonClickNoRipple
 import com.cactuslauncher.ui.softShadow
-import com.cactuslauncher.ui.BannerArtwork
+import androidx.compose.ui.graphics.ImageBitmap
+import com.cactuslauncher.model.NewsArticle
 import com.cactuslauncher.model.LauncherBuild
 import com.cactuslauncher.ui.InstanceArtwork
 import com.cactuslauncher.ui.SearchBox
@@ -38,7 +38,9 @@ import androidx.compose.runtime.*
 fun HomeScreen(
     builds: List<LauncherBuild> = emptyList(),
     onOpenBuilds: () -> Unit,
-    onOpenNews: () -> Unit,
+    featuredNews: List<NewsArticle>,
+    loadNewsImage: suspend (String) -> ImageBitmap?,
+    onOpenNews: (NewsArticle) -> Unit,
     onOpenBuild: (LauncherBuild) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
@@ -60,25 +62,8 @@ fun HomeScreen(
         if (query.isBlank() || builds.isEmpty()) {
             FeaturedBuild(featured, onOpenBuilds, onOpenBuild)
 
-            Box(
-                Modifier.fillMaxWidth().height(136.dp)
-                    .clip(RoundedCornerShape(28.dp)).background(C.banner)
-                    .clickNoRipple(onOpenNews),
-            ) {
-                BannerArtwork(Modifier.fillMaxSize())
-                Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(listOf(Color.Black.copy(alpha = 0.8f), Color.Black.copy(alpha = 0.12f)))))
-                Row(
-                    Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        T(MinecraftReleaseNews.versionLabel, 13, C.bannerEyebrow, lineHeight = 16)
-                        T(MinecraftReleaseNews.title, 24, Color.White, FontWeight.SemiBold, lineHeight = 29)
-                        T(MinecraftReleaseNews.summary, 14, C.bannerText, lineHeight = 18, maxLines = 1)
-                    }
-                    T("Читать →", 15, Color.White, FontWeight.Medium, lineHeight = 18)
-                }
+            featuredNews.forEach { post ->
+                NewsBanner(post, loadNewsImage, compact = true) { onOpenNews(post) }
             }
         }
 

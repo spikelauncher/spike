@@ -98,6 +98,11 @@ fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit =
     }
     val profiles = remember { ProfilesState(game, scope, messages) }
     val updates = remember { UpdatesState(game) }
+    var news by remember(game) { mutableStateOf(emptyList<NewsArticle>()) }
+    LaunchedEffect(game) {
+        news = game.loadNews(refresh = false)
+        news = game.loadNews(refresh = true)
+    }
     val builds = remember { BuildsState(game, scope, preferences, profiles, messages) }
     val mods = remember { ModsState(game, scope, preferences, builds, navigation, messages) }
     val logs = remember { LogsState(game, scope, preferences, profiles, messages) }
@@ -283,7 +288,7 @@ fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit =
                     ) { (page, buildDetail, logsId) ->
                         val (route, article) = page
                         if (article != null) {
-                            NewsReader(article = article, onBack = {
+                            NewsReader(article = article, loadImage = game::newsImage, onBack = {
                                 navigation.dest = Dest.News
                                 navigation.newsArticle = null
                             })
@@ -299,7 +304,9 @@ fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit =
                                     builds.selectedBuild = null
                                     navigation.dest = Dest.Builds
                                 },
-                                onOpenNews = { navigation.newsArticle = NewsArticle.WildernessBound },
+                                featuredNews = news.filter { it.featured },
+                                loadNewsImage = game::newsImage,
+                                onOpenNews = { navigation.newsArticle = it },
                                 onOpenBuild = { build ->
                                     logs.buildId = null
                                     builds.selectedBuild = build
@@ -465,7 +472,7 @@ fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit =
                                 onOpenBuilds = { navigation.dest = Dest.Builds },
                             )
                             Dest.News -> newsState.SaveableStateProvider("news-list") {
-                                NewsScreen(onOpenArticle = { navigation.newsArticle = it })
+                                NewsScreen(news, game::newsImage, onOpenArticle = { navigation.newsArticle = it })
                             }
                         }
                     }

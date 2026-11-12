@@ -32,6 +32,24 @@ class GameServiceImpl(private val core: GameCore = GameCore()) : GameService {
     private val desktopMediaPlayer = DesktopMediaPlayer()
     private val profileStore = ProfileStore(ProfileStore.defaultFile())
     private val preferencesStore = LauncherPreferencesStore(ProfileStore.defaultFile().resolveSibling("settings.properties"))
+    private val newsStore = NewsStore(ProfileStore.defaultFile().resolveSibling("news"))
+
+    override suspend fun loadNews(refresh: Boolean) = kotlinx.coroutines.runInterruptible(Dispatchers.IO) {
+        val posts = if (refresh) newsStore.refresh() else newsStore.loadCached()
+        posts.map { post ->
+            com.cactuslauncher.model.NewsArticle(
+                post.id(), post.badge(), post.title(), post.summary(), post.cardSummary(), post.byline(),
+                post.featured(), post.showBodyOnCard(), post.banners(),
+                post.body().map { com.cactuslauncher.model.NewsBlock(it.title(), it.text()) },
+                post.links().map { com.cactuslauncher.model.NewsLink(it.label(), it.url()) },
+            )
+        }
+    }
+
+    override suspend fun newsImage(url: String) = kotlinx.coroutines.runInterruptible(Dispatchers.IO) {
+        newsStore.image(url)?.toComposeImageBitmap()
+    }
+
     private val releaseUpdater = GithubReleaseUpdater()
     private val horizon = HorizonInstaller(ProfileStore.defaultFile().resolveSibling("horizon"))
     override suspend fun launchHorizon(onRunning: (String) -> Unit) = kotlinx.coroutines.runInterruptible(Dispatchers.IO) {
