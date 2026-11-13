@@ -262,6 +262,7 @@ private fun ColumnScope.ListCard(content: @Composable () -> Unit) {
 @Composable
 private fun ColumnScope.PacksTab(packs: List<InstalledResourcePack>, loading: Boolean, error: String?, onImport: () -> Unit, onToggle: (InstalledResourcePack, Boolean) -> Unit, onOpenFolder: () -> Unit, onRefresh: () -> Unit) {
     var query by remember { mutableStateOf("") }
+    val visiblePacks = remember(packs, query) { packs.filter { it.title.contains(query, true) || it.fileName.contains(query, true) } }
     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(24.dp)) {
         Toolbar("Поиск ресурспаков", "Добавить ресурспак", query, onAction = onImport) { query = it }
         ListCard {
@@ -269,7 +270,7 @@ private fun ColumnScope.PacksTab(packs: List<InstalledResourcePack>, loading: Bo
                 loading -> T("Читаем папку ресурспаков…", 14, C.text2, lineHeight = 20, modifier = Modifier.padding(24.dp))
                 error != null -> T(error, 14, C.danger, lineHeight = 20, modifier = Modifier.padding(24.dp))
                 packs.isEmpty() -> T("В этой сборке пока нет ZIP-ресурспаков.", 14, C.text2, lineHeight = 20, modifier = Modifier.padding(24.dp))
-                else -> packs.filter { it.title.contains(query, true) || it.fileName.contains(query, true) }.forEach { pack ->
+                else -> visiblePacks.forEach { pack ->
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Box(Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(C.accentSoft), contentAlignment = Alignment.Center) { T("ZIP", 11, C.accent, FontWeight.Bold, lineHeight = 14) }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

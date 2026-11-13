@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -139,18 +140,23 @@ fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit =
         builds.loadJavaPlan(builds.selectedBuild)
     }
     LaunchedEffect(Unit) { builds.operation({ game.builds() }) }
+    // Effect keys below are built once per data change, not on every recomposition of the root.
+    val buildIds by remember { derivedStateOf { builds.builds.map { it.id } } }
+    val installedModFiles = remember(mods.installedMods) { mods.installedMods.map { it.fileName } }
+    val projectIcons = remember(mods.projects) { mods.projects.map { it.id to it.iconUrl } }
+    val projectDescriptions = remember(mods.projects) { mods.projects.map { it.id to it.description } }
 
-    LaunchedEffect(navigation.dest, builds.loaded, builds.builds.map { it.id }) {
+    LaunchedEffect(navigation.dest, builds.loaded, buildIds) {
         if (navigation.dest == Dest.Mods && builds.loaded) mods.ensureSelection()
     }
     LaunchedEffect(navigation.dest, builds.loaded, mods.selectedBuildId, mods.reloadKey) {
         if (navigation.dest == Dest.Mods && builds.loaded) mods.loadInstalled()
     }
-    LaunchedEffect(mods.installedModsBuildId, mods.installedMods.map { it.fileName }, mods.reloadKey, preferences.modAntivirusEnabled) {
+    LaunchedEffect(mods.installedModsBuildId, installedModFiles, mods.reloadKey, preferences.modAntivirusEnabled) {
         mods.scanSecurity()
     }
     LaunchedEffect(mods.installedModsBuildId, mods.installedMods, mods.reloadKey) { mods.checkProblems() }
-    LaunchedEffect(navigation.dest, builds.loaded, builds.builds.map { it.id }) {
+    LaunchedEffect(navigation.dest, builds.loaded, buildIds) {
         if (navigation.dest == Dest.Other && builds.loaded) {
             screenshots.ensureSelection()
             servers.ensureSelection()
@@ -160,7 +166,7 @@ fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit =
         if (navigation.dest == Dest.Other && otherSection == OtherSection.Screenshots && builds.loaded) screenshots.watch()
     }
     // The menu's numbers are re-counted each time it is shown.
-    LaunchedEffect(navigation.dest, otherSection, builds.loaded, builds.builds.map { it.id }) {
+    LaunchedEffect(navigation.dest, otherSection, builds.loaded, buildIds) {
         if (navigation.dest == Dest.Other && otherSection == null && builds.loaded) {
             try { otherOverview = game.otherOverview() }
             catch (e: kotlinx.coroutines.CancellationException) { throw e }
@@ -174,9 +180,9 @@ fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit =
     LaunchedEffect(navigation.dest, builds.loaded, mods.selectedBuildId, mods.search, mods.catalogReloadKey, mods.catalogActive) {
         mods.searchCatalog()
     }
-    LaunchedEffect(navigation.dest, mods.catalogActive, mods.projects.map { it.id to it.iconUrl }) { mods.loadIcons() }
+    LaunchedEffect(navigation.dest, mods.catalogActive, projectIcons) { mods.loadIcons() }
     LaunchedEffect(navigation.dest, mods.catalogActive, preferences.translateModDescriptions,
-        mods.projects.map { it.id to it.description }) { mods.translateDescriptions() }
+        projectDescriptions) { mods.translateDescriptions() }
 
     LaunchedEffect(navigation.dest, builds.loaded) {
         if (navigation.dest == Dest.Builds && builds.loaded) builds.pollRunning()

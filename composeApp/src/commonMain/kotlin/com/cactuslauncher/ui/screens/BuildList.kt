@@ -28,8 +28,8 @@ fun BuildListScreen(
     onPlay: (LauncherBuild) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val visible = remember(builds, query) {
-        builds.filter { "${it.name} ${it.version} ${it.loader}".contains(query.trim(), ignoreCase = true) }
+    val visible by remember(builds) {
+        derivedStateOf { builds.filter { "${it.name} ${it.version} ${it.loader}".contains(query.trim(), ignoreCase = true) } }
     }
     LazyColumn(
         Modifier.fillMaxSize(),

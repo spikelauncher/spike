@@ -39,12 +39,15 @@ fun NewsScreen(
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val term = query.trim()
-    val visible = posts.filter {
-        it.title.contains(term, true) || it.badge.contains(term, true) || it.summary.contains(term, true) ||
-            it.cardSummary.contains(term, true) || it.body.any { block ->
-                block.title.contains(term, true) || block.text.contains(term, true)
-            }
+    val visible = remember(posts, term) {
+        posts.filter {
+            it.title.contains(term, true) || it.badge.contains(term, true) || it.summary.contains(term, true) ||
+                it.cardSummary.contains(term, true) || it.body.any { block ->
+                    block.title.contains(term, true) || block.text.contains(term, true)
+                }
+        }
     }
+    val featured = remember(visible) { visible.filter { it.featured } }
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(40.dp),
@@ -60,7 +63,7 @@ fun NewsScreen(
                 SearchBox(query, { query = it }, "Поиск новостей", Modifier.width(280.dp), elevated = true, fill = C.surface)
             }
         }
-        items(visible.filter { it.featured }, key = { "banner:${it.id}" }) { post ->
+        items(featured, key = { "banner:${it.id}" }) { post ->
             NewsBanner(post, loadImage) { onOpenArticle(post) }
         }
         items(visible, key = { "post:${it.id}" }) { post ->
