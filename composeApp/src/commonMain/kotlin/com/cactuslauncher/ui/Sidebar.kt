@@ -39,6 +39,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -239,14 +242,20 @@ private fun PlayerPopup(
         val duration = track?.durationSeconds ?: 0
         val playing = track?.isPlaying == true
         var tick by remember { mutableIntStateOf(0) }
-        LaunchedEffect(playing) { while (playing) { delay(100); tick++ } }
+        LaunchedEffect(playing) { while (playing) { delay(250); tick++ } }
         var dragFraction by remember { mutableStateOf<Float?>(null) }
         val livePosition = tick.let { trackPosition() }
         val fraction = dragFraction ?: if (duration > 0) (livePosition / duration).toFloat().coerceIn(0f, 1f) else 0f
         val position = dragFraction?.let { (it * duration).roundToInt() } ?: livePosition.toInt()
+        // Glide between 250 ms position ticks so the bar moves every frame without recomposing the panel.
+        val shownFraction by animateFloatAsState(
+            fraction,
+            if (dragFraction == null && playing) tween(250, easing = LinearEasing) else snap(),
+            label = "seek",
+        )
         if (duration > 0) {
             SeekBar(
-                fraction = fraction,
+                fraction = shownFraction,
                 enabled = track != null && track.canSeek,
                 dragging = dragFraction != null,
                 onDrag = { dragFraction = it },

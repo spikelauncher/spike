@@ -44,7 +44,7 @@ fun HomeScreen(
     onOpenBuild: (LauncherBuild) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val visible = builds.filter { it.name.contains(query.trim(), true) }
+    val visible by remember(builds) { derivedStateOf { builds.filter { it.name.contains(query.trim(), true) } } }
     val featured = builds.firstOrNull()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(40.dp),
