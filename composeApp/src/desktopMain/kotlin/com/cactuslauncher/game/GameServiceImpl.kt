@@ -499,6 +499,7 @@ class GameServiceImpl(private val core: GameCore = GameCore()) : GameService {
         val snapshot = profileStore.load()
         return snapshot.profiles().firstOrNull { it.id() == snapshot.activeId() }
             ?: snapshot.profiles().firstOrNull()
+            ?: externalSession?.let { ProfileStore.Profile(it.uuid(), it.name()) }
             ?: throw IOException("Создайте профиль игрока перед запуском.")
     }
     private val launchFailures = java.util.concurrent.ConcurrentLinkedQueue<Pair<String, String>>()

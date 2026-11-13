@@ -11,6 +11,25 @@ class ProfileStoreTest {
     @TempDir Path temp;
 
     @Test
+    void firstLaunchHasNoGeneratedNicknameAndFirstAddedProfileBecomesActive() throws Exception {
+        Path file = temp.resolve("profiles.properties");
+        var store = new ProfileStore(file);
+        assertTrue(store.load().profiles().isEmpty());
+        assertEquals("", store.load().activeId());
+        assertFalse(Files.exists(file));
+        var created = store.add("MyPlayer");
+        assertEquals(1, created.profiles().size());
+        assertEquals("MyPlayer", created.profiles().getFirst().name());
+        assertEquals(created, new ProfileStore(file).load());
+    }
+
+    @Test
+    void existingNickIsPreservedAsAUserProfile() throws Exception {
+        Path file = Files.writeString(temp.resolve("profiles.properties"), "active=a\norder=a\nprofile.a=Nick\n");
+        assertEquals("Nick", new ProfileStore(file).load().profiles().getFirst().name());
+    }
+
+    @Test
     void fileWithoutAvatarsLoads() throws Exception {
         Path file = Files.writeString(temp.resolve("profiles.properties"),
             "#Cactus Launcher offline profiles\nactive=b\norder=a,b\nprofile.a=Steve\nprofile.b=Alex_2\n");
@@ -24,7 +43,7 @@ class ProfileStoreTest {
     @Test
     void avatarSurvivesRenameAndIsRemovedWithProfile() throws Exception {
         var store = new ProfileStore(temp.resolve("profiles.properties"));
-        String first = store.load().profiles().getFirst().id();
+        String first = store.add("First").activeId();
         String second = store.add("Second").activeId();
         store.setAvatar(second, "0123456789abcdef");
         assertEquals("0123456789abcdef", store.rename(second, "Renamed").profiles().get(1).avatar());

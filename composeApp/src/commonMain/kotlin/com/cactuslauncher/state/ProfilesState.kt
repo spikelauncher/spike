@@ -34,6 +34,21 @@ class ProfilesState(private val game: GameService, private val scope: CoroutineS
         }
     }
 
+    /** Switch only after persistence succeeds, so failures keep the previous account usable. */
+    fun select(id: String) = operation {
+        val snapshot = game.selectProfile(id)
+        signOut()
+        open = false
+        snapshot
+    }
+
+    fun add(name: String) = operation {
+        val snapshot = game.addProfile(name.trim())
+        signOut()
+        open = false
+        snapshot
+    }
+
     fun chooseAvatar(id: String) = avatarOperation("Не удалось установить картинку профиля.") { game.chooseProfileAvatar(id) }
 
     fun removeAvatar(id: String) = avatarOperation("Не удалось убрать картинку профиля.") { game.removeProfileAvatar(id) }
@@ -58,6 +73,7 @@ class ProfilesState(private val game: GameService, private val scope: CoroutineS
             try {
                 externalAccountName = game.signInExternal(apiRoot, username, password)
                 externalApiRoot = apiRoot.trim().trimEnd('/')
+                open = false
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

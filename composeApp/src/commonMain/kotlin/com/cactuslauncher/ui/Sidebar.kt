@@ -73,6 +73,7 @@ fun Sidebar(
     profileName: String,
     onOpenProfiles: () -> Unit,
     profileAvatar: androidx.compose.ui.graphics.ImageBitmap? = null,
+    profileSubtitle: String = "Офлайн-профиль",
     trackPosition: () -> Double = { currentTrack?.positionSeconds?.toDouble() ?: 0.0 },
     onSeek: (Int) -> Unit = {},
     horizonEnabled: Boolean = false,
@@ -93,7 +94,7 @@ fun Sidebar(
                 ProfileAvatar(profileName, profileAvatar, 36.dp)
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     T("$profileName ▾", 15, C.text1, lineHeight = 18, maxLines = 1)
-                    T("Офлайн-профиль", 12, C.text2, lineHeight = 15)
+                    T(profileSubtitle, 12, C.text2, lineHeight = 15)
                 }
             }
 

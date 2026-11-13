@@ -27,6 +27,7 @@ fun ProfilesDialog(
     onSelect: (String) -> Unit, onDelete: (String) -> Unit,
     externalAccountName: String? = null,
     advancedMode: Boolean = false,
+    microsoftLabel: String = "Microsoft",
     onSignInExternal: (String, String, String) -> Unit = { _, _, _ -> },
     onSignOutExternal: () -> Unit = {},
     onChooseAvatar: (String) -> Unit = {},
@@ -35,7 +36,9 @@ fun ProfilesDialog(
     var name by remember { mutableStateOf("") }
     var editing by remember { mutableStateOf<PlayerProfile?>(null) }
     var deleting by remember { mutableStateOf<PlayerProfile?>(null) }
-    var microsoftUnavailable by remember { mutableStateOf(false) }
+    var typePickerOpen by remember { mutableStateOf(false) }
+    var offlineFormOpen by remember { mutableStateOf(false) }
+    var elyLogin by remember { mutableStateOf(false) }
     var authlibLoginOpen by remember { mutableStateOf(false) }
     var apiRoot by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
@@ -50,11 +53,25 @@ fun ProfilesDialog(
             authlibLoginOpen = false
         }
     }
-    LaunchedEffect(advancedMode) {
-        if (!advancedMode) {
+    LaunchedEffect(advancedMode, elyLogin) {
+        if (!advancedMode && !elyLogin) {
             authlibLoginOpen = false
             password = ""
         }
+    }
+    if (typePickerOpen) {
+        ProfileTypeDialog(microsoftLabel, onDismiss = { typePickerOpen = false }) { type ->
+            if (!busy) {
+                when (type) {
+                    ProfileType.Offline -> { offlineFormOpen = true; authlibLoginOpen = false }
+                    ProfileType.Ely -> { elyLogin = true; apiRoot = "https://account.ely.by/api/authlib-injector"; authlibLoginOpen = true; offlineFormOpen = false }
+                    ProfileType.Microsoft -> Unit
+                }
+                password = ""
+                typePickerOpen = false
+            }
+        }
+        return
     }
     Modal(onDismiss) {
         Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -64,14 +81,17 @@ fun ProfilesDialog(
                     T("✕", 14, C.text2, FontWeight.Medium, lineHeight = 17)
                 }
             }
-            T("Выберите офлайн-профиль для игры или добавьте новый.", 15, C.text2, lineHeight = 20)
+            T("Выберите профиль для игры или создайте новый.", 15, C.text2, lineHeight = 20)
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (snapshot == null && !busy) {
                     T("Не удалось загрузить профили", 16, C.text1, FontWeight.Medium, lineHeight = 20)
                     T("Повторить", 14, C.accent, lineHeight = 18, modifier = Modifier.buttonClickNoRipple(onRetry))
                 }
+                if (snapshot?.profiles?.isEmpty() == true) {
+                    T("Создайте профиль для игры.", 14, C.text2, lineHeight = 20)
+                }
                 snapshot?.profiles?.forEach { profile ->
-                    val active = profile.id == snapshot.activeId
+                    val active = externalAccountName == null && profile.id == snapshot.activeId
                     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(if (active) C.accentSoft else C.input).padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         ProfileAvatar(profile.name, profile.avatar, 40.dp, Modifier.buttonClickNoRipple { if (!busy) onChooseAvatar(profile.id) })
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -104,26 +124,29 @@ fun ProfilesDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 when {
-                    externalAccountName != null -> {
-                        T("Authlib Injector: ${externalAccountName}", 14, C.text1, FontWeight.Medium, lineHeight = 18)
+                    externalAccountName != null && editing == null && !authlibLoginOpen && !offlineFormOpen -> {
+                        T(if (elyLogin) "Ely.by: $externalAccountName" else "Аккаунт: $externalAccountName", 14, C.text1, FontWeight.Medium, lineHeight = 18)
+                        T("Изменить тип профиля", 14, C.accent, FontWeight.Medium, lineHeight = 18,
+                            modifier = Modifier.buttonClickNoRipple { if (!busy) typePickerOpen = true })
                         T("Выйти", 13, C.danger, lineHeight = 16, modifier = Modifier.buttonClickNoRipple { if (!busy) onSignOutExternal() })
                     }
                     authlibLoginOpen -> {
-                        T("Вход через Authlib Injector", 15, C.text1, FontWeight.Medium, lineHeight = 18)
-                        SearchBox(apiRoot, { apiRoot = it }, "API сервера, например https://auth.example/api", Modifier.fillMaxWidth(), height = 44.dp)
+                        T(if (elyLogin) "Вход в Ely.by" else "Вход через Authlib Injector", 15, C.text1, FontWeight.Medium, lineHeight = 18)
+                        if (!elyLogin) SearchBox(apiRoot, { apiRoot = it }, "API сервера, например https://auth.example/api", Modifier.fillMaxWidth(), height = 44.dp)
                         SearchBox(username, { username = it }, "Логин или почта", Modifier.fillMaxWidth(), height = 44.dp)
                         SearchBox(password, { password = it }, "Пароль", Modifier.fillMaxWidth(), height = 44.dp, obscureText = true)
                         T("Пароль и токен остаются только в памяти лаунчера.", 12, C.text2, lineHeight = 15)
                     }
                     editing == null -> {
-                        T("Новый профиль", 15, C.text1, FontWeight.Medium, lineHeight = 18)
-                        T("Войти через Microsoft", 14, C.accent, FontWeight.Medium, lineHeight = 18,
-                            modifier = Modifier.buttonClickNoRipple { microsoftUnavailable = true })
-                        if (microsoftUnavailable) T("Пока недоступно в бете", 12, C.text2, lineHeight = 15)
-                        if (advancedMode) T("Войти через Authlib Injector", 14, C.accent, FontWeight.Medium, lineHeight = 18,
-                            modifier = Modifier.buttonClickNoRipple { authlibLoginOpen = true; microsoftUnavailable = false })
-                        SearchBox(name, { name = it }, "Имя игрока", Modifier.fillMaxWidth(), height = 44.dp)
-                        T("3-16 символов: A-Z, a-z, 0-9 и _", 12, C.text2, lineHeight = 15)
+                        if (offlineFormOpen) {
+                            T("Оффлайн-профиль", 15, C.text1, FontWeight.Medium, lineHeight = 18)
+                            SearchBox(name, { name = it }, "Имя игрока", Modifier.fillMaxWidth(), height = 44.dp)
+                            T("3-16 символов: A-Z, a-z, 0-9 и _", 12, C.text2, lineHeight = 15)
+                        }
+                        T(if (offlineFormOpen) "Изменить тип профиля" else "+ Новый профиль", 14, C.accent, FontWeight.Medium, lineHeight = 18,
+                            modifier = Modifier.buttonClickNoRipple { if (!busy) typePickerOpen = true })
+                        if (advancedMode) T("Другой сервер Authlib Injector", 13, C.text2, lineHeight = 18,
+                            modifier = Modifier.buttonClickNoRipple { if (!busy) { elyLogin = false; apiRoot = ""; authlibLoginOpen = true } })
                     }
                     else -> {
                         T("Переименование профиля", 15, C.text1, FontWeight.Medium, lineHeight = 18)
@@ -147,7 +170,7 @@ fun ProfilesDialog(
             error?.let { T(it, 13, C.danger, lineHeight = 18) }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
                 if (authlibLoginOpen) {
-                    T("Назад", 14, C.text2, lineHeight = 18, modifier = Modifier.buttonClickNoRipple { if (!busy) authlibLoginOpen = false })
+                    T("Назад", 14, C.text2, lineHeight = 18, modifier = Modifier.buttonClickNoRipple { if (!busy) { authlibLoginOpen = false; password = ""; typePickerOpen = true } })
                     val canSignIn = apiRoot.startsWith("https://") && username.isNotBlank() && password.isNotEmpty() && !busy
                     Box(Modifier.clip(RoundedCornerShape(999.dp)).background(if (canSignIn) C.accentFill else C.fill).buttonClickNoRipple {
                         if (canSignIn) onSignInExternal(apiRoot.trim(), username.trim(), password)
@@ -156,7 +179,7 @@ fun ProfilesDialog(
                     }
                 } else {
                     if (editing != null) T("Отмена", 14, C.text2, lineHeight = 18, modifier = Modifier.buttonClickNoRipple { editing = null; name = "" })
-                    if (externalAccountName == null) Box(Modifier.clip(RoundedCornerShape(999.dp)).background(if (valid && !busy && snapshot != null) C.accentFill else C.fill).buttonClickNoRipple {
+                    if (offlineFormOpen || editing != null) Box(Modifier.clip(RoundedCornerShape(999.dp)).background(if (valid && !busy && snapshot != null) C.accentFill else C.fill).buttonClickNoRipple {
                         if (valid && !busy && snapshot != null) { editing?.let { onRename(it.id, name) } ?: onAdd(name) }
                     }.padding(horizontal = 24.dp, vertical = 12.dp)) {
                         T(if (busy) "Сохранение…" else if (editing == null) "Добавить профиль" else "Сохранить", 15, if (valid && !busy) C.onAccent else C.text2, FontWeight.Medium, lineHeight = 18)
@@ -165,4 +188,5 @@ fun ProfilesDialog(
             }
         }
     }
+
 }

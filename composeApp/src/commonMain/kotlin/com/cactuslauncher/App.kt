@@ -80,7 +80,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit = {}) {
+fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit = {}, microsoftLabel: String = "Microsoft") {
     val pageOffset = with(LocalDensity.current) { 6.dp.roundToPx() }
     val scope = rememberCoroutineScope()
     val messages = remember { AppMessages(game) }
@@ -259,8 +259,13 @@ fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit =
                     onTrackCommand = { command -> player.command(command) },
                     playerExpanded = player.expanded,
                     onTogglePlayer = { player.expanded = !player.expanded },
-                    profileName = profiles.profiles?.active?.name ?: "Профиль",
-                    profileAvatar = profiles.profiles?.active?.avatar,
+                    profileSubtitle = when {
+                        profiles.externalAccountName == null -> "Офлайн-профиль"
+                        profiles.launchAuthServer == "https://account.ely.by/api/authlib-injector" -> "Ely.by"
+                        else -> "Внешний аккаунт"
+                    },
+                    profileName = profiles.externalAccountName ?: profiles.profiles?.active?.name ?: "Профиль",
+                    profileAvatar = profiles.profiles?.active?.avatar.takeIf { profiles.externalAccountName == null },
                     onOpenProfiles = { profiles.open = true },
                     trackPosition = player::position,
                     onSeek = player::seek,
@@ -541,7 +546,7 @@ fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit =
                     preferences,
                     settings.javaOptimizationInfo,
                     settings.preferencesError,
-                    initialNickname = profiles.profiles?.active?.name ?: "Nick",
+                    initialNickname = profiles.profiles?.active?.name.orEmpty(),
                     onChooseFolder = { current -> game.chooseDirectory(current) },
                     onComplete = { nickname ->
                         if (nickname != null) profiles.applySetupNickname(nickname)
@@ -563,14 +568,15 @@ fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit =
                 snapshot = profiles.profiles, busy = profiles.busy, error = profiles.error,
                 onDismiss = { profiles.open = false },
                 onRetry = { profiles.operation { game.profiles() } },
-                onAdd = { name -> profiles.operation { game.addProfile(name) } },
+                onAdd = { name -> profiles.add(name) },
                 onRename = { id, name -> profiles.operation { game.renameProfile(id, name) } },
-                onSelect = { id -> profiles.operation { game.selectProfile(id) } },
+                onSelect = { id -> profiles.select(id) },
                 onDelete = { id -> profiles.operation { game.deleteProfile(id) } },
                 onChooseAvatar = { id -> profiles.chooseAvatar(id) },
                 onRemoveAvatar = { id -> profiles.removeAvatar(id) },
                 externalAccountName = profiles.externalAccountName,
                 advancedMode = preferences.advancedMode,
+                microsoftLabel = microsoftLabel,
                 onSignInExternal = { apiRoot, username, password -> profiles.signIn(apiRoot, username, password) },
                 onSignOutExternal = { profiles.signOut() },
             ) }

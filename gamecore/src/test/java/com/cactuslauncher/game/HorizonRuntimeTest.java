@@ -68,6 +68,7 @@ class HorizonRuntimeTest {
         Path directory = temp.resolve("horizon");
         var installer = new HorizonTest.Fixture(HorizonTest.bundle(new JsonObject())).installer(directory, runtime);
         var profiles = new ProfileStore(temp.resolve("profiles.properties"));
+        profiles.add("OfflineName");
         assertThrows(IOException.class, () -> installer.launch(profiles, name -> fail()));
         Path root = Path.of(installer.install(p -> {}).path());
         assertThrows(IOException.class, () -> installer.launch(profiles, name -> fail()));
@@ -132,6 +133,7 @@ class HorizonRuntimeTest {
         var installer = new HorizonTest.Fixture(HorizonTest.bundle(new JsonObject())).installer(directory, runtime);
         resources(Path.of(installer.install(p -> {}).path()));
         ProfileStore profiles = new ProfileStore(temp.resolve("profiles.properties"));
+        profiles.add("OfflineName");
         CountDownLatch started = new CountDownLatch(1);
         AtomicReference<Throwable> failure = new AtomicReference<>();
         Thread launch = Thread.ofPlatform().start(() -> {

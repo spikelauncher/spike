@@ -28,10 +28,7 @@ public final class ProfileStore {
 
     public synchronized Snapshot load() throws IOException {
         if (!Files.exists(file)) {
-            Snapshot initial = new Snapshot(List.of(new Profile(UUID.randomUUID().toString(), "Nick")), "");
-            initial = new Snapshot(initial.profiles(), initial.profiles().getFirst().id());
-            save(initial);
-            return initial;
+            return new Snapshot(List.of(), "");
         }
         Properties p = new Properties();
         try (InputStream input = Files.newInputStream(file)) { p.load(input); }

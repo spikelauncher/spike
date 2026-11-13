@@ -708,6 +708,7 @@ fun InitialSetupDialog(
 ) {
     var step by remember { mutableIntStateOf(1) }
     var nickname by remember { mutableStateOf(initialNickname) }
+    var nicknameEdited by remember { mutableStateOf(false) }
     var editingFolder by remember { mutableStateOf(false) }
     var otherSettingsOpen by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -716,7 +717,7 @@ fun InitialSetupDialog(
     val scope = rememberCoroutineScope()
     val nicknameValid = isValidPlayerName(nickname)
     LaunchedEffect(initialNickname) {
-        if (step == 1 && nickname == "Nick") nickname = initialNickname
+        if (step == 1 && !nicknameEdited) nickname = initialNickname
     }
     fun finish(name: String?) {
         if (busy) return
@@ -773,7 +774,7 @@ fun InitialSetupDialog(
                         if (currentStep == 1) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 T("Никнейм", 13, C.text1, FontWeight.Medium, lineHeight = 16)
-                                SetupInput(nickname, { nickname = it; localError = null }, "Steve")
+                                SetupInput(nickname, { nickname = it; nicknameEdited = true; localError = null }, "Введите никнейм")
                                 T("3-16 символов: A-Z, a-z, 0-9 и _", 12, if (nicknameValid || nickname.isEmpty()) C.text2 else C.danger, lineHeight = 15)
                             }
                             SetupToggle("Автооптимизация Java", settings.autoJavaOptimization) { settings.autoJavaOptimization = it }
