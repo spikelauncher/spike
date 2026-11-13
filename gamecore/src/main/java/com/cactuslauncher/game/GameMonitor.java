@@ -61,8 +61,13 @@ public final class GameMonitor implements Runnable {
 
     public static Path statusFileFrom(List<String> command) {
         for (String argument : command) {
-            if (!argument.startsWith("-javaagent:") || !argument.contains(AGENT_RESOURCE + "=")) continue;
-            return Path.of(argument.substring(argument.indexOf(AGENT_RESOURCE + "=") + AGENT_RESOURCE.length() + 1));
+            if (!argument.startsWith("-javaagent:")) continue;
+            int name = argument.indexOf("fps-agent");
+            if (name < 0) continue;
+            int separator = argument.indexOf(".jar=", name);
+            if (separator < 0) continue;
+            String status = argument.substring(separator + ".jar=".length());
+            if (!status.isBlank()) return Path.of(status);
         }
         return null;
     }
