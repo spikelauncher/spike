@@ -426,6 +426,9 @@ fun SettingsDialog(
                         GameRow("Ghost Mode") {
                             Switch(settings.ghostMode) { settings.ghostMode = it }
                         }
+                        GameRow("Буст FPS") {
+                            Switch(settings.systemBoost) { settings.systemBoost = it }
+                        }
                         javaOptimizationInfo?.let { info ->
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 T("${info.totalRamGb} ГБ ОЗУ, доступно ${info.availableRamGb} ГБ, ${info.logicalProcessors} потоков", 12, C.text2, lineHeight = 15, maxLines = 1)

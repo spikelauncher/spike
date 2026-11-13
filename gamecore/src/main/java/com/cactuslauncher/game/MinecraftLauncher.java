@@ -164,13 +164,19 @@ public final class MinecraftLauncher {
                         + " ГБ, флаги=" + (selectedOptimizationArguments.isEmpty() ? "нет" : String.join(" ", selectedOptimizationArguments))
                         + (compatible.rejected().isEmpty() ? "" : ", JVM не приняла=" + String.join(" ", compatible.rejected())) + "\n",
                 StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+        SystemBoost.beforeLaunch(executable);
         if (ghostMode) {
-            GhostModeHandoff.start(command, root, launchLog, optimization.machine());
+            try { GhostModeHandoff.start(command, root, launchLog, optimization.machine()); }
+            catch (IOException | RuntimeException e) { SystemBoost.restoreIdle(); throw e; }
+            SystemBoost.afterLaunch(executable, null);
             return null;
         }
         ProcessBuilder builder = new ProcessBuilder(command).directory(gameDirectory.toFile()).redirectErrorStream(true);
         if (legacyHome != null && os.equals("windows")) builder.environment().put("APPDATA", legacyHome.toString());
-        Process process = builder.start();
+        Process process;
+        try { process = builder.start(); }
+        catch (IOException | RuntimeException e) { SystemBoost.restoreIdle(); throw e; }
+        SystemBoost.afterLaunch(executable, process);
         Thread outputLogger = new Thread(() -> writeGameOutput(process, launchLog), "cactus-game-output");
         outputLogger.setDaemon(true);
         outputLogger.start();

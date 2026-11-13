@@ -32,6 +32,7 @@ public final class GhostModeDaemon {
             Thread playtime = trackPlaytime(game, data.gameDirectory());
             writeGameOutput(game, data.logFile());
             int exitCode = game.waitFor();
+            SystemBoost.restoreIdle();
             boolean quickExit = System.nanoTime() - startedNanos < java.util.concurrent.TimeUnit.SECONDS.toNanos(90);
             recordGhostExit(data.gameDirectory(), exitCode, quickExit);
             playtime.join(5000);
