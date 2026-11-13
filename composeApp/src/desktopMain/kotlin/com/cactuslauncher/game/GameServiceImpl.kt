@@ -387,7 +387,6 @@ class GameServiceImpl(private val core: GameCore = GameCore()) : GameService {
     }
     override suspend fun loadPreferences() = withContext(Dispatchers.IO) {
         val loaded = preferencesStore.load()
-        // Puts back GPU choices left over from a game that outlived the previous launcher run.
         SystemBoost.setEnabled(loaded?.systemBoost() ?: true)
         SystemBoost.restoreIdle()
         loaded?.let {

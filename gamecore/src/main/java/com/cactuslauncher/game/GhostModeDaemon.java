@@ -29,6 +29,7 @@ public final class GhostModeDaemon {
             gameStarted = true;
             writeStatus(status, "OK");
             startupConfirmed = true;
+            GameMonitor.start(game, data.gameDirectory(), GameMonitor.statusFileFrom(data.gameCommand()));
             Thread playtime = trackPlaytime(game, data.gameDirectory());
             writeGameOutput(game, data.logFile());
             int exitCode = game.waitFor();

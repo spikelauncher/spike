@@ -17,6 +17,21 @@ java {
     }
 }
 
+val fpsAgent: SourceSet by sourceSets.creating
+tasks.named<JavaCompile>(fpsAgent.compileJavaTaskName) {
+    options.release.set(8)
+    options.compilerArgs.add("-Xlint:-options")
+}
+val fpsAgentJar by tasks.registering(Jar::class) {
+    archiveFileName.set("fps-agent.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("fps-agent"))
+    from(fpsAgent.output)
+    manifest { attributes("Premain-Class" to "com.cactuslauncher.fpsagent.FpsAgent") }
+}
+tasks.processResources {
+    from(fpsAgentJar) { into("com/cactuslauncher/game") }
+}
+
 val checkBuildStore by tasks.registering(JavaExec::class) {
     dependsOn(tasks.testClasses)
     classpath = sourceSets.test.get().runtimeClasspath

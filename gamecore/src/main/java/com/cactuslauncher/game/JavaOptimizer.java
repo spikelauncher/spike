@@ -181,11 +181,16 @@ public final class JavaOptimizer {
 
     public Plan plan(Path modsDirectory, int javaMajor, int requestedHeapGb,
                      boolean automaticHeap, boolean automaticOptimization) {
+        return plan(modsDirectory, javaMajor, requestedHeapGb, automaticHeap, automaticOptimization, 0);
+    }
+
+    public Plan plan(Path modsDirectory, int javaMajor, int requestedHeapGb,
+                     boolean automaticHeap, boolean automaticOptimization, int minimumHeapGb) {
         Machine machine = inspect();
         long[] modStats = inspectMods(modsDirectory);
         int count = (int) modStats[0];
         long bytes = modStats[1];
-        int recommendedHeap = recommendHeap(machine, count, bytes);
+        int recommendedHeap = Math.max(recommendHeap(machine, count, bytes), Math.min(minimumHeapGb, maxSafeHeapGb(machine)));
         int heap = automaticHeap ? recommendedHeap : Math.max(2, Math.min(maxSafeHeapGb(machine), requestedHeapGb));
         String collector = "G1GC";
         List<String> args = automaticOptimization ? arguments(javaMajor, heap, count, machine.processors()) : List.of();

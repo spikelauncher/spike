@@ -13,21 +13,17 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-/**
- * Quiet, reversible system tweaks for the game process (Windows only):
- * <ul>
- *   <li>the game's Java runs on the high-performance (discrete) GPU on hybrid-graphics laptops;</li>
- *   <li>the game process gets "above normal" CPU priority.</li>
- * </ul>
- * The GPU choice is a per-user Windows setting, so the previous value is journaled before it is changed and put
- * back once no process of that Java is running any more: when the game exits, or on the next launcher start if
- * the launcher was closed first. The priority belongs to the process and disappears with it.
- * Nothing here may break a launch: every failure is swallowed.
- */
 public final class SystemBoost {
     static final String GPU_KEY = "HKCU\\Software\\Microsoft\\DirectX\\UserGpuPreferences";
+    static final String POWER_SAVER = "a1841308-3542-4a6e-8a7b-9c71d5c9b0e4";
+    static final String BALANCED = "381b4222-f694-41f0-9685-ff5bb260df2e";
     private static final String HIGH_PERFORMANCE = "GpuPreference=2";
+    private static final String UNREADABLE = "\u0000";
+    private static final Pattern REG_SZ_LINE = Pattern.compile("\\s{2,}REG_SZ\\s{2,}(.*)$");
+    private static final Pattern GUID = Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
     private static volatile boolean enabled = true;
     private static final Object LOCK = new Object();
 
@@ -40,38 +36,30 @@ public final class SystemBoost {
 
     public static boolean enabled() { return enabled; }
 
-    /** Call right before the game process starts: the GPU choice is read when the process opens its device. */
     public static void beforeLaunch(Path javaExecutable) {
         if (!enabled || !windows() || javaExecutable == null) return;
         try {
             synchronized (LOCK) {
                 String exe = javaExecutable.toAbsolutePath().normalize().toString();
-                Path journal = journal(exe);
-                if (!Files.isRegularFile(journal)) {
-                    String original = queryGpuPreference(exe);
-                    if (UNREADABLE.equals(original)) return;
-                    String current = original == null ? "" : original;
-                    // Respect an explicit user choice (power saving or already high performance).
-                    if (gpuChoice(current) != 0) return;
-                    var values = new Properties();
-                    values.setProperty("exe", exe);
-                    values.setProperty("absent", Boolean.toString(original == null));
-                    values.setProperty("original", current);
-                    Files.createDirectories(journal.getParent());
-                    try (var output = Files.newOutputStream(journal)) { values.store(output, null); }
-                    if (!run("reg", "add", GPU_KEY, "/v", exe, "/t", "REG_SZ", "/d", withHighPerformance(current), "/f")) {
-                        Files.deleteIfExists(journal);
-                    }
+                Path journal = gpuJournal(exe);
+                if (Files.isRegularFile(journal)) return;
+                String original = queryGpuPreference(exe);
+                if (UNREADABLE.equals(original)) return;
+                String current = original == null ? "" : original;
+                if (gpuChoice(current) != 0) return;
+                var values = new Properties();
+                values.setProperty("exe", exe);
+                values.setProperty("absent", Boolean.toString(original == null));
+                values.setProperty("original", current);
+                store(journal, values);
+                if (!run("reg", "add", GPU_KEY, "/v", exe, "/t", "REG_SZ", "/d", withHighPerformance(current), "/f")) {
+                    Files.deleteIfExists(journal);
                 }
             }
         } catch (IOException | RuntimeException ignored) {
         }
     }
 
-    /**
-     * Call once the game is running. [game] is null when another process (Ghost Mode) owns it; the game is then
-     * found by its Java executable.
-     */
     public static void afterLaunch(Path javaExecutable, Process game) {
         if (!windows() || javaExecutable == null) return;
         String exe = javaExecutable.toAbsolutePath().normalize().toString();
@@ -88,25 +76,67 @@ public final class SystemBoost {
                 catch (Exception ignored) { }
                 restoreIdle();
             }
-        }, "cactus-system-boost");
+        }, "spike-system-boost");
         worker.setDaemon(true);
         worker.start();
     }
 
-    /** Puts back every GPU choice whose Java is no longer running. Safe to call at any time. */
+    static boolean leavePowerSaver(long gamePid) {
+        if (!enabled || !windows()) return false;
+        try {
+            synchronized (LOCK) {
+                Path journal = folder().resolve("power.properties");
+                if (Files.isRegularFile(journal)) return false;
+                String active = activePowerScheme();
+                if (!POWER_SAVER.equalsIgnoreCase(active)) return false;
+                var values = new Properties();
+                values.setProperty("original", active);
+                values.setProperty("applied", BALANCED);
+                putProcess(values, "game", gamePid);
+                store(journal, values);
+                if (run("powercfg", "/setactive", BALANCED)) return true;
+                Files.deleteIfExists(journal);
+            }
+        } catch (IOException | RuntimeException ignored) {
+        }
+        return false;
+    }
+
+    static boolean lowerPriority(ProcessHandle target, long gamePid, WindowsHelper helper) {
+        if (!enabled || helper == null || target == null) return false;
+        try {
+            synchronized (LOCK) {
+                long pid = target.pid();
+                if (!"Normal".equals(helper.priority(pid, ""))) return false;
+                Path journal = folder().resolve("prio-" + pid + ".properties");
+                var values = new Properties();
+                putProcess(values, "target", pid);
+                putProcess(values, "game", gamePid);
+                store(journal, values);
+                if (helper.priority(pid, "BelowNormal") != null) return true;
+                Files.deleteIfExists(journal);
+            }
+        } catch (IOException | RuntimeException ignored) {
+        }
+        return false;
+    }
+
+    static void restoreLowered(WindowsHelper helper) {
+        if (!windows()) return;
+        try {
+            synchronized (LOCK) {
+                for (Path file : journals("prio-*.properties")) restorePriority(file, helper);
+            }
+        } catch (IOException | RuntimeException ignored) {
+        }
+    }
+
     public static void restoreIdle() {
         if (!windows()) return;
         try {
             synchronized (LOCK) {
-                Path folder = folder();
-                if (!Files.isDirectory(folder)) return;
-                List<Path> journals = new ArrayList<>();
-                try (DirectoryStream<Path> files = Files.newDirectoryStream(folder, "gpu-*.properties")) {
-                    for (Path file : files) journals.add(file);
-                }
-                for (Path file : journals) {
-                    var values = new Properties();
-                    try (var input = Files.newInputStream(file)) { values.load(input); }
+                for (Path file : journals("gpu-*.properties")) {
+                    var values = load(file);
                     String exe = values.getProperty("exe", "");
                     if (exe.isBlank()) { Files.deleteIfExists(file); continue; }
                     if (enabled && ProcessHandle.allProcesses().anyMatch(handle -> runs(handle, exe))) continue;
@@ -115,12 +145,29 @@ public final class SystemBoost {
                             : run("reg", "add", GPU_KEY, "/v", exe, "/t", "REG_SZ", "/d", values.getProperty("original", ""), "/f");
                     if (restored) Files.deleteIfExists(file);
                 }
+                for (Path file : journals("prio-*.properties")) {
+                    if (enabled && alive(load(file), "game")) continue;
+                    restorePriority(file, null);
+                }
+                Path power = folder().resolve("power.properties");
+                if (Files.isRegularFile(power)) {
+                    var values = load(power);
+                    if (!enabled || !alive(values, "game")) {
+                        String applied = values.getProperty("applied", "");
+                        String original = values.getProperty("original", "");
+                        boolean untouched = applied.equalsIgnoreCase(activePowerScheme());
+                        if (!untouched || original.isBlank() || run("powercfg", "/setactive", original)) Files.deleteIfExists(power);
+                    }
+                }
             }
         } catch (IOException | RuntimeException ignored) {
         }
     }
 
-    /** 0 = let Windows decide, 1 = power saving, 2 = high performance. */
+    static boolean windows() {
+        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+    }
+
     static int gpuChoice(String data) {
         for (String part : data.split(";")) {
             String item = part.trim();
@@ -132,7 +179,6 @@ public final class SystemBoost {
         return 0;
     }
 
-    /** Keeps the other per-app DirectX options and replaces only the GPU choice. */
     static String withHighPerformance(String data) {
         var result = new StringBuilder();
         for (String part : data.split(";")) {
@@ -143,12 +189,6 @@ public final class SystemBoost {
         return result.append(HIGH_PERFORMANCE).append(';').toString();
     }
 
-    private static final java.util.regex.Pattern REG_SZ_LINE = java.util.regex.Pattern.compile("\\s{2,}REG_SZ\\s{2,}(.*)$");
-
-    /**
-     * Parses the data out of `reg query /v` output (one value). The value name is not compared: reg prints it in
-     * the console code page, which garbles non-ASCII user folders.
-     */
     static String parseRegQuery(String output) {
         if (output == null) return null;
         for (String line : output.split("\\R")) {
@@ -158,9 +198,49 @@ public final class SystemBoost {
         return null;
     }
 
-    private static final String UNREADABLE = "\u0000";
+    static String parseGuid(String output) {
+        if (output == null) return null;
+        Matcher match = GUID.matcher(output);
+        return match.find() ? match.group().toLowerCase(Locale.ROOT) : null;
+    }
 
-    /** The current data, [UNREADABLE] for a value that exists but cannot be parsed, null when it does not exist. */
+    private static String activePowerScheme() {
+        return parseGuid(output("powercfg", "/getactivescheme"));
+    }
+
+    private static void restorePriority(Path file, WindowsHelper helper) throws IOException {
+        var values = load(file);
+        if (alive(values, "target")) {
+            long pid = Long.parseLong(values.getProperty("target.pid"));
+            if (helper != null) {
+                if ("BelowNormal".equals(helper.priority(pid, ""))) helper.priority(pid, "Normal");
+            } else {
+                run("powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                        "$p=Get-Process -Id " + pid + " -ErrorAction SilentlyContinue;"
+                                + "if($p -and $p.PriorityClass -eq 'BelowNormal'){$p.PriorityClass='Normal'}");
+            }
+        }
+        Files.deleteIfExists(file);
+    }
+
+    private static void putProcess(Properties values, String prefix, long pid) {
+        values.setProperty(prefix + ".pid", Long.toString(pid));
+        values.setProperty(prefix + ".start", ProcessHandle.of(pid)
+                .flatMap(handle -> handle.info().startInstant()).map(instant -> Long.toString(instant.toEpochMilli())).orElse(""));
+    }
+
+    private static boolean alive(Properties values, String prefix) {
+        try {
+            long pid = Long.parseLong(values.getProperty(prefix + ".pid", ""));
+            String start = values.getProperty(prefix + ".start", "");
+            return ProcessHandle.of(pid).filter(ProcessHandle::isAlive).map(handle -> start.isEmpty()
+                    || handle.info().startInstant().map(instant -> Long.toString(instant.toEpochMilli()).equals(start)).orElse(true))
+                    .orElse(false);
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
     private static String queryGpuPreference(String exe) {
         String output = output("reg", "query", GPU_KEY, "/v", exe);
         if (output == null) return null;
@@ -186,7 +266,28 @@ public final class SystemBoost {
         return ProfileStore.defaultFile().resolveSibling("system-boost");
     }
 
-    private static Path journal(String exe) {
+    private static List<Path> journals(String glob) throws IOException {
+        Path folder = folder();
+        List<Path> files = new ArrayList<>();
+        if (!Files.isDirectory(folder)) return files;
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder, glob)) {
+            for (Path file : stream) files.add(file);
+        }
+        return files;
+    }
+
+    private static Properties load(Path file) throws IOException {
+        var values = new Properties();
+        try (var input = Files.newInputStream(file)) { values.load(input); }
+        return values;
+    }
+
+    private static void store(Path file, Properties values) throws IOException {
+        Files.createDirectories(file.getParent());
+        try (var output = Files.newOutputStream(file)) { values.store(output, null); }
+    }
+
+    private static Path gpuJournal(String exe) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(exe.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8));
             return folder().resolve("gpu-" + HexFormat.of().formatHex(digest, 0, 12) + ".properties");
@@ -195,15 +296,10 @@ public final class SystemBoost {
         }
     }
 
-    private static boolean windows() {
-        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
-    }
-
     private static boolean run(String... command) {
         return output(command) != null;
     }
 
-    /** Output of a successful command, or null on failure or timeout. */
     private static String output(String... command) {
         Process process = null;
         try {

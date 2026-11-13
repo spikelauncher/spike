@@ -29,6 +29,13 @@ class SystemBoostTest {
     }
 
     @Test
+    void parsesPowerSchemeGuid() {
+        assertEquals(SystemBoost.POWER_SAVER, SystemBoost.parseGuid(
+                "Идентификатор схемы питания: A1841308-3542-4A6E-8A7B-9C71D5C9B0E4  (Экономия энергии)"));
+        assertNull(SystemBoost.parseGuid("nothing here"));
+    }
+
+    @Test
     void savedPreferenceDefaultsToOn() throws Exception {
         var store = new LauncherPreferencesStore(java.nio.file.Files.createTempDirectory("boost").resolve("p.properties"));
         store.save(new LauncherPreferencesStore.Preferences(true, true, 4, 4, true, true, true, true, true, false, false, true,

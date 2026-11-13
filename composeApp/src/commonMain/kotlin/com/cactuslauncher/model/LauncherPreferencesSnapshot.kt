@@ -26,6 +26,5 @@ data class LauncherPreferencesSnapshot(
     val ghostModeIntroSeen: Boolean = false,
     val horizonEnabled: Boolean = false,
     val horizonAutoUpdate: Boolean = false,
-    /** Game on the discrete GPU and above-normal priority while it runs (Windows); undone when it exits. */
     val systemBoost: Boolean = true,
 )
