@@ -2,9 +2,9 @@ package com.cactuslauncher.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,10 +31,12 @@ fun BuildListScreen(
     val visible = remember(builds, query) {
         builds.filter { "${it.name} ${it.version} ${it.loader}".contains(query.trim(), ignoreCase = true) }
     }
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(40.dp),
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(40.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
+        item(key = "header") { Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 T("Сборки", 32, C.text1, FontWeight.SemiBold, lineHeight = 39)
@@ -59,7 +61,8 @@ fun BuildListScreen(
                     modifier = Modifier.buttonClickNoRipple { if (builds.isEmpty()) onCreate() else query = "" })
             }
         }
-        visible.forEach { build ->
+        } }
+        items(visible, key = { it.id }) { build ->
             Row(
                 Modifier.fillMaxWidth().softShadow(RoundedCornerShape(20.dp))
                     .clip(RoundedCornerShape(20.dp)).background(C.surface)
