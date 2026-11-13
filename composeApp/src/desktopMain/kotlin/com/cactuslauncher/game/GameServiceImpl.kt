@@ -388,6 +388,7 @@ class GameServiceImpl(private val core: GameCore = GameCore()) : GameService {
     override suspend fun loadPreferences() = withContext(Dispatchers.IO) {
         val loaded = preferencesStore.load()
         SystemBoost.setEnabled(loaded?.systemBoost() ?: true)
+        GameMonitor.setEnabled(loaded?.fpsMonitor() ?: true)
         SystemBoost.restoreIdle()
         loaded?.let {
             menuMusicPack = it.menuMusicPack()
@@ -397,19 +398,20 @@ class GameServiceImpl(private val core: GameCore = GameCore()) : GameService {
                  it.translateModDescriptions(), it.modAntivirusEnabled(), it.resolution(), it.folder(), it.theme(),
 
                 it.launcherMusic(), it.menuMusicPack(), it.playerMode(), it.radioEnabled(), it.ghostModeIntroSeen(),
-                it.horizonEnabled(), it.horizonAutoUpdate(), it.systemBoost(),
+                it.horizonEnabled(), it.horizonAutoUpdate(), it.systemBoost(), it.fpsMonitor(),
             )
         }
     }
     override suspend fun savePreferences(value: com.cactuslauncher.model.LauncherPreferencesSnapshot) = withContext(Dispatchers.IO) {
         menuMusicPack = value.menuMusicPack
         SystemBoost.setEnabled(value.systemBoost)
+        GameMonitor.setEnabled(value.fpsMonitor)
         preferencesStore.save(LauncherPreferencesStore.Preferences(
             value.setupComplete, value.showPlayer, value.parallelDownloads, value.memoryGb, value.automaticMemory,
             value.autoJavaOptimization, value.ghostMode, value.fullscreen, value.autoUpdate, value.advancedMode,
              value.translateModDescriptions, value.modAntivirusEnabled, value.resolution, value.folder, value.theme,
              value.launcherMusic, value.menuMusicPack, value.playerMode, value.radioEnabled, value.ghostModeIntroSeen,
-             value.horizonEnabled, value.horizonAutoUpdate, value.systemBoost,
+             value.horizonEnabled, value.horizonAutoUpdate, value.systemBoost, value.fpsMonitor,
 
         ))
     }

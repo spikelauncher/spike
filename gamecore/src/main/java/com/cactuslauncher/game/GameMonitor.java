@@ -34,11 +34,17 @@ public final class GameMonitor implements Runnable {
 
     record Sample(int fps, long heapUsed, long heapMax, long gcMillis, long uptimeMillis) {}
 
+    private static volatile boolean enabled = true;
     private final Process game;
     private final Path root;
     private final Path status;
     private final Set<String> applied = new HashSet<>();
     private WindowsHelper helper;
+    private String priorityBeforeBackground;
+
+    public static void setEnabled(boolean value) { enabled = value; }
+
+    public static boolean enabled() { return enabled; }
 
     private GameMonitor(Process game, Path root, Path status) {
         this.game = game;
@@ -143,7 +149,7 @@ public final class GameMonitor implements Runnable {
 
     private void enterBackground(long pid) {
         if (helper == null) return;
-        helper.priority(pid, "BelowNormal");
+        priorityBeforeBackground = helper.priority(pid, "BelowNormal");
         helper.efficiencyMode(pid, true);
         SystemBoost.restoreLowered(helper);
     }
@@ -151,7 +157,9 @@ public final class GameMonitor implements Runnable {
     private void enterForeground(long pid) {
         if (helper == null) return;
         helper.efficiencyMode(pid, false);
-        helper.priority(pid, "AboveNormal");
+        String previous = priorityBeforeBackground == null || priorityBeforeBackground.equals("BelowNormal")
+                ? "Normal" : priorityBeforeBackground;
+        helper.priority(pid, previous);
     }
 
     private void diagnose(long pid, List<Sample> window, int fps) {

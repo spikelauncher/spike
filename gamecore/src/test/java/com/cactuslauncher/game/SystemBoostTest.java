@@ -41,5 +41,6 @@ class SystemBoostTest {
         store.save(new LauncherPreferencesStore.Preferences(true, true, 4, 4, true, true, true, true, true, false, false, true,
                 "1920 × 1080", "/games", "dark"));
         assertTrue(store.load().systemBoost());
+        assertTrue(store.load().fpsMonitor());
     }
 }

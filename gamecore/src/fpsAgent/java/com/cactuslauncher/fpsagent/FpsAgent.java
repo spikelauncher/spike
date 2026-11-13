@@ -1,6 +1,7 @@
 package com.cactuslauncher.fpsagent;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.lang.instrument.Instrumentation;
 import java.lang.management.GarbageCollectorMXBean;
@@ -20,14 +21,21 @@ public final class FpsAgent implements Runnable {
     private static final Pattern FPS = Pattern.compile("^(\\d{1,5}) fps");
     private final Instrumentation instrumentation;
     private final File status;
+    private final File cache;
     private Object game;
     private Field fpsText;
+    private Field selfField;
     private long nextSearch;
     private int searches;
+    private String[] cached;
+    private int cachedTries;
+    private boolean cachedClassSeen;
+    private boolean cacheFailed;
 
     private FpsAgent(Instrumentation instrumentation, File status) {
         this.instrumentation = instrumentation;
         this.status = status;
+        this.cache = new File(status.getParentFile(), "spike-fps.cache");
     }
 
     public static void premain(String argument, Instrumentation instrumentation) {
@@ -56,9 +64,16 @@ public final class FpsAgent implements Runnable {
     private void tick() throws Exception {
         long now = System.currentTimeMillis();
         if (fpsText == null && now >= nextSearch) {
-            search();
-            searches++;
-            nextSearch = now + (searches < 40 ? 3000 : 60000);
+            if (useCache()) {
+                findCached();
+                cachedTries++;
+                nextSearch = now + 1000;
+            } else {
+                search();
+                searches++;
+                nextSearch = now + (searches < 40 ? 3000 : 60000);
+                if (fpsText != null) saveCache();
+            }
         }
         int fps = -1;
         if (fpsText != null) {
@@ -81,6 +96,74 @@ public final class FpsAgent implements Runnable {
         finally { output.close(); }
     }
 
+    private boolean useCache() {
+        if (cached == null) {
+            cached = new String[0];
+            try {
+                if (cache.isFile() && cache.length() < 4096) {
+                    byte[] bytes = new byte[(int) cache.length()];
+                    FileInputStream input = new FileInputStream(cache);
+                    try {
+                        int read = 0;
+                        while (read < bytes.length) {
+                            int count = input.read(bytes, read, bytes.length - read);
+                            if (count < 0) break;
+                            read += count;
+                        }
+                    } finally {
+                        input.close();
+                    }
+                    String[] parts = new String(bytes, Charset.forName("UTF-8")).trim().split(" ");
+                    if (parts.length == 3) cached = parts;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return cached.length == 3 && !cacheFailed && cachedTries < (cachedClassSeen ? 15 : 90);
+    }
+
+    private void findCached() {
+        Class<?> type = null;
+        for (Class<?> loaded : instrumentation.getAllLoadedClasses()) {
+            if (loaded.getName().equals(cached[0])) { type = loaded; break; }
+        }
+        if (type == null) return;
+        if (!cachedClassSeen) {
+            cachedClassSeen = true;
+            cachedTries = 0;
+        }
+        try {
+            Field self = type.getDeclaredField(cached[1]);
+            Field text = type.getDeclaredField(cached[2]);
+            if (!Modifier.isStatic(self.getModifiers()) || self.getType() != type || text.getType() != String.class) {
+                cacheFailed = true;
+                return;
+            }
+            if (!open(type, self)) return;
+            Object instance = self.get(null);
+            if (instance == null) return;
+            text.setAccessible(true);
+            Object value = text.get(instance);
+            if (value instanceof String && FPS.matcher((String) value).find()) {
+                game = instance;
+                fpsText = text;
+            }
+        } catch (NoSuchFieldException missing) {
+            cacheFailed = true;
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void saveCache() {
+        try {
+            String line = fpsText.getDeclaringClass().getName() + " " + selfField.getName() + " " + fpsText.getName() + "\n";
+            FileOutputStream output = new FileOutputStream(cache, false);
+            try { output.write(line.getBytes(Charset.forName("UTF-8"))); }
+            finally { output.close(); }
+        } catch (Throwable ignored) {
+        }
+    }
+
     private void search() {
         Class<?>[] classes = instrumentation.getAllLoadedClasses();
         for (Class<?> type : classes) {
@@ -101,6 +184,7 @@ public final class FpsAgent implements Runnable {
                         if (value instanceof String && FPS.matcher((String) value).find()) {
                             game = instance;
                             fpsText = text;
+                            selfField = self;
                             return;
                         }
                     }

@@ -148,7 +148,7 @@ public final class MinecraftLauncher {
         command.removeIf(argument -> argument.startsWith("-XX:MaxRAMPercentage="));
         command.add("-Xmx" + optimization.heapGb() + "G");
         command.addAll(selectedOptimizationArguments);
-        if (SystemBoost.enabled()) command.addAll(GameMonitor.agentArguments(root));
+        if (GameMonitor.enabled()) command.addAll(GameMonitor.agentArguments(root));
         command.add(info.get("mainClass").getAsString());
         if (info.has("arguments")) append(command, info.getAsJsonObject("arguments").getAsJsonArray("game"), values);
         else for (String argument : info.get("minecraftArguments").getAsString().split(" +")) command.add(expand(argument, values));

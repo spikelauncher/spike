@@ -27,4 +27,5 @@ data class LauncherPreferencesSnapshot(
     val horizonEnabled: Boolean = false,
     val horizonAutoUpdate: Boolean = false,
     val systemBoost: Boolean = true,
+    val fpsMonitor: Boolean = true,
 )

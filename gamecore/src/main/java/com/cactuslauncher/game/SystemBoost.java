@@ -82,7 +82,7 @@ public final class SystemBoost {
     }
 
     static boolean leavePowerSaver(long gamePid) {
-        if (!enabled || !windows()) return false;
+        if (!windows()) return false;
         try {
             synchronized (LOCK) {
                 Path journal = folder().resolve("power.properties");
@@ -103,7 +103,7 @@ public final class SystemBoost {
     }
 
     static boolean lowerPriority(ProcessHandle target, long gamePid, WindowsHelper helper) {
-        if (!enabled || helper == null || target == null) return false;
+        if (helper == null || target == null) return false;
         try {
             synchronized (LOCK) {
                 long pid = target.pid();
@@ -146,13 +146,13 @@ public final class SystemBoost {
                     if (restored) Files.deleteIfExists(file);
                 }
                 for (Path file : journals("prio-*.properties")) {
-                    if (enabled && alive(load(file), "game")) continue;
+                    if (alive(load(file), "game")) continue;
                     restorePriority(file, null);
                 }
                 Path power = folder().resolve("power.properties");
                 if (Files.isRegularFile(power)) {
                     var values = load(power);
-                    if (!enabled || !alive(values, "game")) {
+                    if (!alive(values, "game")) {
                         String applied = values.getProperty("applied", "");
                         String original = values.getProperty("original", "");
                         boolean untouched = applied.equalsIgnoreCase(activePowerScheme());
