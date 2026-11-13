@@ -81,6 +81,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit = {}, microsoftLabel: String = "Microsoft") {
+    val richMotion = com.cactuslauncher.ui.LocalMotionQuality.current == com.cactuslauncher.ui.MotionQuality.Full
     val pageOffset = with(LocalDensity.current) { 6.dp.roundToPx() }
     val scope = rememberCoroutineScope()
     val messages = remember { AppMessages(game) }
@@ -287,7 +288,7 @@ fun App(game: GameService, onGhostMode: () -> Unit, onBringToFront: () -> Unit =
                         },
                         transitionSpec = {
                             (fadeIn(tween(160, easing = CactusMotion.easeOut)) +
-                                slideInVertically(tween(CactusMotion.normal, easing = CactusMotion.easeOut)) { pageOffset })
+                                slideInVertically(tween(CactusMotion.normal, easing = CactusMotion.easeOut)) { if (richMotion) pageOffset else 0 })
                                 .togetherWith(fadeOut(tween(90)))
                         }, label = "navigation",
                     ) { (page, buildDetail, logsId) ->

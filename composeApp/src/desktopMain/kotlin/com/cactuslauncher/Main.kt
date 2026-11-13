@@ -5,6 +5,13 @@ import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import com.cactuslauncher.ui.AdaptiveMotionProvider
+import java.awt.event.WindowFocusListener
+import java.awt.event.WindowEvent
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -25,6 +32,7 @@ fun main() {
     application {
         val state = rememberWindowState(size = DpSize(1200.dp, 760.dp))
         val game = remember { GameServiceImpl() }
+        val motionQuality = remember { desktopMotionQuality() }
         val version = remember { LauncherBuildInfo.version() }
         Window(
             onCloseRequest = { game.stopLauncherMusic(); exitApplication() },
@@ -32,6 +40,16 @@ fun main() {
             title = if (version.isEmpty()) "Spike Launcher" else "Spike Launcher $version Beta",
             icon = painterResource(Res.drawable.spike_launcher),
         ) {
+            var focused by remember { mutableStateOf(window.isFocused) }
+            DisposableEffect(window) {
+                val listener = object : WindowFocusListener {
+                    override fun windowGainedFocus(event: WindowEvent) { focused = true }
+                    override fun windowLostFocus(event: WindowEvent) { focused = false }
+                }
+                window.addWindowFocusListener(listener)
+                onDispose { window.removeWindowFocusListener(listener) }
+            }
+            val refreshRate = window.graphicsConfiguration.device.displayMode.refreshRate
             val dark = C.dark
             // macOS: match the title bar to the launcher theme.
             LaunchedEffect(dark) {
@@ -44,16 +62,18 @@ fun main() {
             // Light keeps the default selection colours.
             val selection = if (dark) TextSelectionColors(C.accent, C.accent.copy(alpha = 0.35f)) else LocalTextSelectionColors.current
             CompositionLocalProvider(LocalTextSelectionColors provides selection) {
-                App(
-                    game,
-                    microsoftLabel = com.cactuslauncher.ui.microsoftProfileLabel(launchCount),
-                    onGhostMode = { game.stopLauncherMusic(); exitApplication() },
-                    onBringToFront = {
-                        if (state.isMinimized) state.isMinimized = false
-                        window.toFront()
-                        window.requestFocus()
-                    },
-                )
+                AdaptiveMotionProvider(motionQuality, refreshRate, focused && !state.isMinimized) {
+                    App(
+                        game,
+                        microsoftLabel = com.cactuslauncher.ui.microsoftProfileLabel(launchCount),
+                        onGhostMode = { game.stopLauncherMusic(); exitApplication() },
+                        onBringToFront = {
+                            if (state.isMinimized) state.isMinimized = false
+                            window.toFront()
+                            window.requestFocus()
+                        },
+                    )
+                }
             }
         }
     }

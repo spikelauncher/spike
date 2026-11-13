@@ -179,7 +179,7 @@ private data class AuthorLink(val label: String, val url: String, val icon: Draw
 private val authorLinkGroups = listOf(
     "Проект" to listOf(
         AuthorLink("Telegram-канал разработчиков", "https://t.me/virrek_cactus", Res.drawable.author_telegram),
-        AuthorLink("Профиль на LibriumHub", "https://libriumhub.com/user/user-6j8ktk6gsv_m", Res.drawable.author_libriumhub),
+        AuthorLink("Spike Launcher на LibriumHub", "https://libriumhub.com/project/spikelauncher", Res.drawable.author_libriumhub),
         AuthorLink("Исходный код на GitHub", "https://github.com/spikelauncher/spike", Res.drawable.author_github),
     ),
     "Разработчики" to listOf(

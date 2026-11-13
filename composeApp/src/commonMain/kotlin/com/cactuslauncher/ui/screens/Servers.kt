@@ -125,6 +125,7 @@ internal fun ColumnScope.ServersSection(
 }
 
 private val cardShape = RoundedCornerShape(16.dp)
+@Composable
 private fun Modifier.card() = fillMaxWidth().softShadow(cardShape, elevation = 4.dp, color = Color(0x10000000)).clip(cardShape).background(C.surface)
 
 @Composable

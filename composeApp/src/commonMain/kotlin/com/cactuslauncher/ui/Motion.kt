@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.collect
 
 @Composable
 fun MotionDropdown(visible: Boolean, onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    val richMotion = LocalMotionQuality.current == MotionQuality.Full
     val state = remember { MutableTransitionState(false) }
     val offset = with(LocalDensity.current) { 6.dp.roundToPx() }
     state.targetState = visible
@@ -41,10 +42,10 @@ fun MotionDropdown(visible: Boolean, onDismiss: () -> Unit, content: @Composable
             AnimatedVisibility(
                 visibleState = state,
                 enter = fadeIn(tween(140, easing = CactusMotion.easeOut)) +
-                    scaleIn(tween(180, easing = CactusMotion.easeOut), initialScale = 0.985f, transformOrigin = TransformOrigin(0.5f, 0f)) +
-                    slideInVertically(tween(180, easing = CactusMotion.easeOut)) { -offset },
+                    scaleIn(tween(180, easing = CactusMotion.easeOut), initialScale = if (richMotion) 0.985f else 1f, transformOrigin = TransformOrigin(0.5f, 0f)) +
+                    slideInVertically(tween(180, easing = CactusMotion.easeOut)) { if (richMotion) -offset else 0 },
                 exit = fadeOut(tween(110, easing = CactusMotion.easeOut)) +
-                    scaleOut(tween(110, easing = CactusMotion.easeOut), targetScale = 0.985f, transformOrigin = TransformOrigin(0.5f, 0f)),
+                    scaleOut(tween(110, easing = CactusMotion.easeOut), targetScale = if (richMotion) 0.985f else 1f, transformOrigin = TransformOrigin(0.5f, 0f)),
             ) { content() }
         }
     }
@@ -63,7 +64,8 @@ object CactusMotion {
 
 @Composable
 internal fun tactileMotionEnabled(): Boolean =
-    (rememberCoroutineScope().coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f) > 0f
+    LocalMotionQuality.current != MotionQuality.Reduced &&
+        (rememberCoroutineScope().coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f) > 0f
 
 @Composable
 internal fun rememberTactileScale(target: Float, label: String, engaged: Boolean = false): State<Float> =

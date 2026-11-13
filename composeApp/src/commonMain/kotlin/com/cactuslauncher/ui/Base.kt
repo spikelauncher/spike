@@ -451,11 +451,19 @@ private fun SliderThumb(fraction: State<Float>, trackWidthPx: State<Float>, sour
     )
 }
 
+@Composable
 fun Modifier.softShadow(
     shape: Shape = RoundedCornerShape(20.dp),
     elevation: Dp = 8.dp,
     color: Color = Color(0x14000000),
-): Modifier = this.shadow(elevation, shape, clip = false, ambientColor = color, spotColor = color)
+): Modifier {
+    val adjusted = when (LocalMotionQuality.current) {
+        MotionQuality.Full -> elevation
+        MotionQuality.Balanced -> minOf(elevation, 4.dp)
+        MotionQuality.Reduced -> 0.dp
+    }
+    return if (adjusted > 0.dp) this.shadow(adjusted, shape, clip = false, ambientColor = color, spotColor = color) else this
+}
 
 @Composable
 fun T(

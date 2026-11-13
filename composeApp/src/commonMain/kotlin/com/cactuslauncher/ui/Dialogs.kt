@@ -89,10 +89,12 @@ fun Modal(
     content: @Composable () -> Unit,
 ) {
     val focus = remember { FocusRequester() }
+    val richMotion = LocalMotionQuality.current == MotionQuality.Full
     val entrance = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        focus.requestFocus()
-        entrance.animateTo(1f, tween(CactusMotion.normal, easing = CactusMotion.easeOut))
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    LaunchedEffect(richMotion) {
+        if (richMotion) entrance.animateTo(1f, tween(CactusMotion.normal, easing = CactusMotion.easeOut))
+        else entrance.snapTo(1f)
     }
     Box(
         Modifier.fillMaxSize().focusRequester(focus).onPreviewKeyEvent {
@@ -109,9 +111,9 @@ fun Modal(
                 .heightIn(max = height)
                 .then(if (wrapHeight) Modifier else Modifier.fillMaxHeight())
                 .graphicsLayer {
-                    scaleX = 0.985f + entrance.value * 0.015f
+                    scaleX = if (richMotion) 0.985f + entrance.value * 0.015f else 1f
                     scaleY = scaleX
-                    translationY = (1f - entrance.value) * 8.dp.toPx()
+                    translationY = if (richMotion) (1f - entrance.value) * 8.dp.toPx() else 0f
                 }
                 .softShadow(RoundedCornerShape(24.dp), elevation = 24.dp, color = Color(0x26000000))
                 .clip(RoundedCornerShape(24.dp))
@@ -706,6 +708,7 @@ fun InitialSetupDialog(
     onComplete: suspend (String?) -> Unit,
     onChooseFolder: suspend (String) -> String?,
 ) {
+    val richMotion = LocalMotionQuality.current == MotionQuality.Full
     var step by remember { mutableIntStateOf(1) }
     var nickname by remember { mutableStateOf(initialNickname) }
     var nicknameEdited by remember { mutableStateOf(false) }
@@ -750,12 +753,12 @@ fun InitialSetupDialog(
                     (fadeIn(tween(CactusMotion.normal, easing = CactusMotion.easeOut)) +
                         slideInHorizontally(
                             animationSpec = tween(CactusMotion.normal, easing = CactusMotion.easeOut),
-                            initialOffsetX = { width -> if (forward) width / 18 else -width / 18 },
+                            initialOffsetX = { width -> if (!richMotion) 0 else if (forward) width / 18 else -width / 18 },
                         )) togetherWith
                         (fadeOut(tween(CactusMotion.quick, easing = CactusMotion.easeOut)) +
                             slideOutHorizontally(
                                 animationSpec = tween(CactusMotion.quick, easing = CactusMotion.easeOut),
-                                targetOffsetX = { width -> if (forward) -width / 24 else width / 24 },
+                                targetOffsetX = { width -> if (!richMotion) 0 else if (forward) -width / 24 else width / 24 },
                             ))
                 },
                 label = "setupStep",
