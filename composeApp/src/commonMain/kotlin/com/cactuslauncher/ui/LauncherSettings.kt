@@ -28,6 +28,8 @@ class LauncherSettings(gameDir: String) {
     var ghostModeIntroSeen by mutableStateOf(false)
     var horizonEnabled by mutableStateOf(false)
     var horizonAutoUpdate by mutableStateOf(false)
+    var systemBoost by mutableStateOf(true)
+    var fpsMonitor by mutableStateOf(true)
 
 
     fun snapshot(setupComplete: Boolean) = LauncherPreferencesSnapshot(
@@ -36,7 +38,7 @@ class LauncherSettings(gameDir: String) {
          translateModDescriptions, modAntivirusEnabled, resolution, folder, theme,
 
         launcherMusic, menuMusicPack, playerMode, radioEnabled, ghostModeIntroSeen,
-        horizonEnabled, horizonAutoUpdate,
+        horizonEnabled, horizonAutoUpdate, systemBoost, fpsMonitor,
     )
 
     fun restore(value: LauncherPreferencesSnapshot) {
@@ -61,6 +63,8 @@ class LauncherSettings(gameDir: String) {
         ghostModeIntroSeen = value.ghostModeIntroSeen
         horizonEnabled = value.horizonEnabled
         horizonAutoUpdate = value.horizonAutoUpdate
+        systemBoost = value.systemBoost
+        fpsMonitor = value.fpsMonitor
     }
 
     fun reset(gameDir: String) {
@@ -85,6 +89,8 @@ class LauncherSettings(gameDir: String) {
         ghostModeIntroSeen = false
         horizonEnabled = false
         horizonAutoUpdate = false
+        systemBoost = true
+        fpsMonitor = true
     }
 
     fun resetGhostMode() {

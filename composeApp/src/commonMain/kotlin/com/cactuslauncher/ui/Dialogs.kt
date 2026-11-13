@@ -426,6 +426,12 @@ fun SettingsDialog(
                         GameRow("Ghost Mode") {
                             Switch(settings.ghostMode) { settings.ghostMode = it }
                         }
+                        GameRow("Буст FPS") {
+                            Switch(settings.systemBoost) { settings.systemBoost = it }
+                        }
+                        GameRow("FPS-монитор") {
+                            Switch(settings.fpsMonitor) { settings.fpsMonitor = it }
+                        }
                         javaOptimizationInfo?.let { info ->
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 T("${info.totalRamGb} ГБ ОЗУ, доступно ${info.availableRamGb} ГБ, ${info.logicalProcessors} потоков", 12, C.text2, lineHeight = 15, maxLines = 1)
@@ -823,6 +829,7 @@ fun InitialSetupDialog(
                             SetupToggle("Проверять и скачивать обновления автоматически", settings.autoUpdate) { settings.autoUpdate = it }
                             SetupToggle("Проверять моды на угрозы", settings.modAntivirusEnabled) { settings.modAntivirusEnabled = it }
                             SetupToggle("Ghost Mode", settings.ghostMode) { settings.ghostMode = it }
+                            SetupToggle("FPS-монитор: следить за FPS и устранять просадки", settings.fpsMonitor) { settings.fpsMonitor = it }
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 T("Параллельные загрузки", 13, C.text1, FontWeight.Medium, lineHeight = 16)
                                 Row(

@@ -31,7 +31,18 @@ public final class LauncherPreferencesStore {
             boolean radioEnabled,
             boolean ghostModeIntroSeen,
             boolean horizonEnabled,
-            boolean horizonAutoUpdate) {
+            boolean horizonAutoUpdate,
+            boolean systemBoost,
+            boolean fpsMonitor) {
+        public Preferences(boolean setupComplete, boolean showPlayer, int parallelDownloads, int memoryGb, boolean automaticMemory,
+                           boolean autoJavaOptimization, boolean ghostMode, boolean fullscreen, boolean autoUpdate, boolean advancedMode,
+                           boolean translateModDescriptions, boolean modAntivirusEnabled, String resolution, String folder, String theme,
+                           boolean launcherMusic, boolean menuMusicPack, String playerMode, boolean radioEnabled,
+                           boolean ghostModeIntroSeen, boolean horizonEnabled, boolean horizonAutoUpdate) {
+            this(setupComplete, showPlayer, parallelDownloads, memoryGb, automaticMemory, autoJavaOptimization, ghostMode, fullscreen,
+                    autoUpdate, advancedMode, translateModDescriptions, modAntivirusEnabled, resolution, folder, theme,
+                    launcherMusic, menuMusicPack, playerMode, radioEnabled, ghostModeIntroSeen, horizonEnabled, horizonAutoUpdate, true, true);
+        }
         public Preferences(boolean setupComplete, boolean showPlayer, int parallelDownloads, int memoryGb, boolean automaticMemory,
                            boolean autoJavaOptimization, boolean ghostMode, boolean fullscreen, boolean autoUpdate, boolean advancedMode,
                            boolean translateModDescriptions, boolean modAntivirusEnabled, String resolution, String folder, String theme,
@@ -96,7 +107,8 @@ public final class LauncherPreferencesStore {
                     optionalEnum(values, "playerMode", "external", java.util.List.of("external", "launcher")),
                     optionalBool(values, "radioEnabled", false),
                     optionalBool(values, "ghostModeIntroSeen", false),
-                    optionalBool(values, "horizonEnabled", false), optionalBool(values, "horizonAutoUpdate", false));
+                    optionalBool(values, "horizonEnabled", false), optionalBool(values, "horizonAutoUpdate", false),
+                    optionalBool(values, "systemBoost", true), optionalBool(values, "fpsMonitor", true));
         } catch (RuntimeException e) {
             throw new IOException("Файл настроек повреждён. Исходный файл сохранён.", e);
         }
@@ -136,6 +148,8 @@ public final class LauncherPreferencesStore {
         values.setProperty("ghostModeIntroSeen", Boolean.toString(value.ghostModeIntroSeen()));
         values.setProperty("horizonEnabled", Boolean.toString(value.horizonEnabled()));
         values.setProperty("horizonAutoUpdate", Boolean.toString(value.horizonAutoUpdate()));
+        values.setProperty("systemBoost", Boolean.toString(value.systemBoost()));
+        values.setProperty("fpsMonitor", Boolean.toString(value.fpsMonitor()));
         Path temp = file.resolveSibling(file.getFileName() + ".tmp-" + UUID.randomUUID());
         try {
             try (var output = Files.newOutputStream(temp)) { values.store(output, null); }

@@ -58,7 +58,7 @@ public final class MinecraftLauncher {
                 : profile.has("inheritsFrom") ? profile.get("inheritsFrom").getAsString() : version;
         int major = info.has("javaVersion") ? info.getAsJsonObject("javaVersion").get("majorVersion").getAsInt() : 8;
         JavaOptimizer.Plan optimization = JAVA_OPTIMIZER.plan(gameDirectory.resolve("mods"), major, memoryGb,
-                automaticHeap, automaticOptimization);
+                automaticHeap, automaticOptimization, GameMonitor.memoryHintGb(root));
         boolean useRosetta = requiresRosetta(info);
         String runtimeArchitecture = useRosetta ? "x64" : null;
         Path executable = new JavaRuntimeManager(root.getParent().getParent().resolve("runtimes")).ensure(major, message -> {}, runtimeArchitecture);
@@ -148,6 +148,7 @@ public final class MinecraftLauncher {
         command.removeIf(argument -> argument.startsWith("-XX:MaxRAMPercentage="));
         command.add("-Xmx" + optimization.heapGb() + "G");
         command.addAll(selectedOptimizationArguments);
+        if (GameMonitor.enabled()) command.addAll(GameMonitor.agentArguments(root));
         command.add(info.get("mainClass").getAsString());
         if (info.has("arguments")) append(command, info.getAsJsonObject("arguments").getAsJsonArray("game"), values);
         else for (String argument : info.get("minecraftArguments").getAsString().split(" +")) command.add(expand(argument, values));
@@ -164,13 +165,20 @@ public final class MinecraftLauncher {
                         + " ГБ, флаги=" + (selectedOptimizationArguments.isEmpty() ? "нет" : String.join(" ", selectedOptimizationArguments))
                         + (compatible.rejected().isEmpty() ? "" : ", JVM не приняла=" + String.join(" ", compatible.rejected())) + "\n",
                 StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+        SystemBoost.beforeLaunch(executable);
         if (ghostMode) {
-            GhostModeHandoff.start(command, root, launchLog, optimization.machine());
+            try { GhostModeHandoff.start(command, root, launchLog, optimization.machine()); }
+            catch (IOException | RuntimeException e) { SystemBoost.restoreIdle(); throw e; }
+            SystemBoost.afterLaunch(executable, null);
             return null;
         }
         ProcessBuilder builder = new ProcessBuilder(command).directory(gameDirectory.toFile()).redirectErrorStream(true);
         if (legacyHome != null && os.equals("windows")) builder.environment().put("APPDATA", legacyHome.toString());
-        Process process = builder.start();
+        Process process;
+        try { process = builder.start(); }
+        catch (IOException | RuntimeException e) { SystemBoost.restoreIdle(); throw e; }
+        SystemBoost.afterLaunch(executable, process);
+        GameMonitor.start(process, root, GameMonitor.statusFileFrom(command));
         Thread outputLogger = new Thread(() -> writeGameOutput(process, launchLog), "cactus-game-output");
         outputLogger.setDaemon(true);
         outputLogger.start();
@@ -189,7 +197,8 @@ public final class MinecraftLauncher {
             if (profile.has("javaVersion") && profile.getAsJsonObject("javaVersion").has("majorVersion"))
                 javaMajor = profile.getAsJsonObject("javaVersion").get("majorVersion").getAsInt();
         }
-        return JAVA_OPTIMIZER.plan(root.resolve("mods"), javaMajor, requestedHeapGb, automaticHeap, automaticOptimization);
+        return JAVA_OPTIMIZER.plan(root.resolve("mods"), javaMajor, requestedHeapGb, automaticHeap, automaticOptimization,
+                GameMonitor.memoryHintGb(root));
     }
 
     private static JsonObject effectiveProfile(Path root, JsonObject profile) throws IOException {
