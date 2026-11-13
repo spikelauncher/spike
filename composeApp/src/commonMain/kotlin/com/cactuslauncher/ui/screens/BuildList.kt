@@ -28,8 +28,8 @@ fun BuildListScreen(
     onPlay: (LauncherBuild) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val visible = builds.filter {
-        "${it.name} ${it.version} ${it.loader}".contains(query.trim(), ignoreCase = true)
+    val visible = remember(builds, query) {
+        builds.filter { "${it.name} ${it.version} ${it.loader}".contains(query.trim(), ignoreCase = true) }
     }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(40.dp),

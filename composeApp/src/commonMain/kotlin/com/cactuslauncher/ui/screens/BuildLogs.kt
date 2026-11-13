@@ -7,12 +7,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -56,13 +57,16 @@ fun BuildLogsScreen(
     var copied by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     val entries = remember(lines, C.dark) { lines.map(::logEntry) }
-    val filtered = entries.filter { entry ->
-        val levelMatches = when (filter) {
-            1 -> entry.level == "WARN" || entry.level == "WARNING"
-            2 -> entry.level == "ERROR" || entry.level == "FATAL"
-            else -> true
+    val filtered = remember(entries, filter, query) {
+        val needle = query.trim()
+        entries.filter { entry ->
+            val levelMatches = when (filter) {
+                1 -> entry.level == "WARN" || entry.level == "WARNING"
+                2 -> entry.level == "ERROR" || entry.level == "FATAL"
+                else -> true
+            }
+            levelMatches && (needle.isEmpty() || entry.message.contains(needle, ignoreCase = true) || entry.level.contains(needle, ignoreCase = true))
         }
-        levelMatches && (query.isBlank() || entry.message.contains(query.trim(), ignoreCase = true) || entry.level.contains(query.trim(), ignoreCase = true))
     }
 
     Column(
@@ -116,19 +120,24 @@ fun BuildLogsScreen(
             }
         }
 
-        Column(
+        LazyColumn(
             Modifier.weight(1f).fillMaxWidth()
                 .softShadow(RoundedCornerShape(20.dp), elevation = 8.dp, color = Color(0x14000000))
-                .clip(RoundedCornerShape(20.dp)).background(C.surface)
-                .verticalScroll(rememberScrollState()).padding(8.dp),
+                .clip(RoundedCornerShape(20.dp)).background(C.surface),
+            contentPadding = PaddingValues(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            when {
-                loading -> T("Загружаем файл логов…", 14, C.text2, lineHeight = 20, modifier = Modifier.padding(16.dp))
-                error != null -> T(error, 14, C.danger, lineHeight = 20, modifier = Modifier.padding(16.dp))
-                entries.isEmpty() -> T("Логов пока нет. Они появятся после первого запуска этой сборки.", 14, C.text2, lineHeight = 20, modifier = Modifier.padding(16.dp))
-                filtered.isEmpty() -> T("По этому фильтру ничего не найдено.", 14, C.text2, lineHeight = 20, modifier = Modifier.padding(16.dp))
-                else -> filtered.forEach { entry ->
+            val notice: Pair<String, Color>? = when {
+                loading -> "Загружаем файл логов…" to C.text2
+                error != null -> error to C.danger
+                entries.isEmpty() -> "Логов пока нет. Они появятся после первого запуска этой сборки." to C.text2
+                filtered.isEmpty() -> "По этому фильтру ничего не найдено." to C.text2
+                else -> null
+            }
+            if (notice != null) {
+                item { T(notice.first, 14, notice.second, lineHeight = 20, modifier = Modifier.padding(16.dp)) }
+            } else {
+                items(filtered) { entry ->
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(entry.background)
                             .padding(horizontal = 16.dp, vertical = 12.dp),

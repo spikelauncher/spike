@@ -239,7 +239,7 @@ private fun PlayerPopup(
         val duration = track?.durationSeconds ?: 0
         val playing = track?.isPlaying == true
         var tick by remember { mutableIntStateOf(0) }
-        LaunchedEffect(playing) { while (playing) { delay(100); tick++ } }
+        LaunchedEffect(playing) { while (playing) { delay(250); tick++ } }
         var dragFraction by remember { mutableStateOf<Float?>(null) }
         val livePosition = tick.let { trackPosition() }
         val fraction = dragFraction ?: if (duration > 0) (livePosition / duration).toFloat().coerceIn(0f, 1f) else 0f
